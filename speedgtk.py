@@ -1222,7 +1222,10 @@ class SpeedtestRun:
 class SpeedGTKWindow(Adw.ApplicationWindow):
     def __init__(self, application, settings, history):
         super().__init__(application=application, title="SpeedGTK")
-        self.set_default_size(560, 820)
+        # Le dimensioni GTK sono in pixel logici: il compositor applica il
+        # fattore di scala del monitor, quindi questi 984 px (+20%) restano
+        # proporzionati sia su display standard sia su schermi HiDPI/4K.
+        self.set_default_size(560, 984)
 
         self._settings = settings
         self._history = history
