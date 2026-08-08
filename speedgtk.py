@@ -48,6 +48,9 @@ PROGRESS_INTERVAL_MS = 100
 # Al termine del test la barra resta un attimo piena, poi si libera per non
 # sembrare il risultato persistente di un test ancora in corso.
 PROGRESS_HIDE_DELAY_MS = 600
+# Espansioni della pagina: abbastanza lente da rendere fluido il ridimensionamento
+# del tachimetro e delle righe sottostanti.
+LAYOUT_TRANSITION_DURATION_MS = 600
 # Secondi di grazia fra SIGTERM e SIGKILL quando si annulla un test.
 KILL_GRACE_SECONDS = 3
 
@@ -1334,14 +1337,18 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._isp_row.set_subtitle_selectable(True)
         self._details_group.add(self._isp_row)
 
-        self._result_row = Adw.ActionRow(title=_("Online result"), visible=False)
+        self._result_row = Adw.ActionRow(title=_("Online result"))
         self._result_link = Gtk.LinkButton.new_with_label("https://www.speedtest.net/", _("Open"))
         self._result_link.set_valign(Gtk.Align.CENTER)
         self._result_row.add_suffix(self._result_link)
-        self._details_group.add(self._result_row)
+        self._result_revealer = Gtk.Revealer()
+        self._result_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
+        self._result_revealer.set_transition_duration(LAYOUT_TRANSITION_DURATION_MS)
+        self._result_revealer.set_child(self._result_row)
+        self._details_group.add(self._result_revealer)
         self._details_revealer = Gtk.Revealer()
         self._details_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
-        self._details_revealer.set_transition_duration(600)
+        self._details_revealer.set_transition_duration(LAYOUT_TRANSITION_DURATION_MS)
         self._details_revealer.set_child(self._details_group)
         box.append(self._details_revealer)
 
@@ -2029,7 +2036,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._upload_icon.set_active(False)
         # I dettagli tornano nascosti: si ripopolano al primo evento del test.
         self._details_revealer.set_reveal_child(False)
-        self._result_row.set_visible(False)
+        self._result_revealer.set_reveal_child(False)
         self._server_detail_row.set_subtitle(PLACEHOLDER)
         self._isp_row.set_subtitle(PLACEHOLDER)
 
@@ -2170,7 +2177,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             self._result_link.set_uri(url)
             self._result_link.set_label(url.rsplit("/", 1)[-1] or _("Open"))
             self._result_link.set_tooltip_text(url)
-            self._result_row.set_visible(True)
+            self._result_revealer.set_reveal_child(True)
 
         self._progress.set_fraction(1.0)
         self._commit_header("download")
