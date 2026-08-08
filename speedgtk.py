@@ -151,10 +151,16 @@ class Translations:
         self._directory = directory
         self._catalog = {}
         self._code = self.SOURCE_CODE
+        self._requested_code = self.SOURCE_CODE
 
     @property
     def code(self):
         return self._code
+
+    @property
+    def follows_system(self):
+        """True quando l'utente ha scelto di seguire la lingua di sistema."""
+        return self._requested_code == "system"
 
     def available(self):
         """Codici lingua utilizzabili: l'inglese più un codice per ogni .po."""
@@ -169,6 +175,7 @@ class Translations:
 
     def use(self, code):
         """Attiva una lingua; "system" segue le impostazioni di sistema."""
+        self._requested_code = code or "system"
         if not code or code == "system":
             code = self._system_code()
         self._code = code
@@ -332,6 +339,18 @@ try:  # i numeri seguono le convenzioni locali (2.208,06 in italiano)
 except locale.Error:
     pass
 
+# Convenzioni per le lingue offerte dall'app: (separatore decimale, migliaia).
+# Il formato di partenza di Python è sempre inglese e viene convertito in
+# format_number(); usarle qui evita di dipendere dalla lingua di Ubuntu.
+NUMBER_SEPARATORS = {
+    "en": (".", ","),
+    "it": (",", "."),
+    "de": (",", "."),
+    "es": (",", "."),
+    "fr": (",", "\u202f"),  # spazio sottile inseparabile
+    "ru": (",", "\u00a0"),  # spazio inseparabile
+}
+
 
 class Settings:
     """Preferenze persistite in un JSON. Salvataggio a ogni modifica."""
@@ -446,10 +465,28 @@ def mbps(bandwidth_bytes_per_second):
 
 
 def format_number(value, decimals=2):
+    """Formatta un numero secondo la lingua scelta nell'app.
+
+    LC_NUMERIC descrive la lingua del sistema, non necessariamente quella
+    selezionata nelle preferenze di SpeedGTK: per esempio, un'app in inglese
+    su Ubuntu in italiano deve mostrare 1,234.56 e non 1.234,56. Solo
+    l'opzione "Same as the system" continua quindi a consultare la locale.
+    """
     try:
-        return locale.format_string(f"%.{decimals}f", value, grouping=True)
-    except (locale.Error, ValueError, TypeError):
-        return f"{value:.{decimals}f}"
+        rendered = f"{float(value):,.{decimals}f}"
+    except (ValueError, TypeError):
+        return str(value)
+
+    if TRANSLATIONS.follows_system:
+        convention = locale.localeconv()
+        decimal = convention.get("decimal_point") or "."
+        grouping = convention.get("thousands_sep") or ""
+    else:
+        decimal, grouping = NUMBER_SEPARATORS.get(TRANSLATIONS.code, NUMBER_SEPARATORS["en"])
+
+    # Il formato Python è volutamente il punto di partenza canonico inglese;
+    # i due rimpiazzi con un segnaposto evitano che punto e virgola si pestino.
+    return rendered.replace(",", "\x00").replace(".", decimal).replace("\x00", grouping)
 
 
 def format_timestamp(iso_text):
