@@ -2026,31 +2026,45 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _present_history(self, *_args):
         dialog = Adw.Dialog(title=_("History"), content_width=680, content_height=580)
         header = Adw.HeaderBar()
-        sort_model = Gtk.StringList()
+        sort_button = Gtk.MenuButton(
+            icon_name="view-sort-ascending-symbolic", tooltip_text=_("Sort history")
+        )
+        sort_button.add_css_class("flat")
+        sort_menu = Gio.Menu()
         for _key, label in HISTORY_SORTS:
-            sort_model.append(_(label))
-        sort_dropdown = Gtk.DropDown(model=sort_model, valign=Gtk.Align.CENTER)
-        header.pack_start(sort_dropdown)
+            sort_menu.append(_(label), f"history.sort::{_key}")
+        sort_button.set_menu_model(sort_menu)
 
         clear_button = Gtk.Button(
             icon_name="user-trash-symbolic", tooltip_text=_("Clear the history")
         )
         clear_button.add_css_class("flat")
-        header.pack_end(clear_button)
+        header.pack_start(clear_button)
+        header.pack_end(sort_button)
 
         view = Adw.ToolbarView()
         view.add_top_bar(header)
         view.set_content(self._build_history_content())
         dialog.set_child(view)
 
+        sort_order = "date"
+
         def refresh():
-            selected = sort_dropdown.get_selected()
-            sort_order = HISTORY_SORTS[selected][0] if selected < len(HISTORY_SORTS) else "date"
             view.set_content(self._build_history_content(sort_order))
             clear_button.set_sensitive(bool(self._history.entries))
 
+        def select_sort(_action, parameter):
+            nonlocal sort_order
+            sort_order = parameter.get_string()
+            refresh()
+
+        sort_actions = Gio.SimpleActionGroup()
+        sort_action = Gio.SimpleAction.new("sort", GLib.VariantType.new("s"))
+        sort_action.connect("activate", select_sort)
+        sort_actions.add_action(sort_action)
+        sort_button.insert_action_group("history", sort_actions)
+
         clear_button.set_sensitive(bool(self._history.entries))
-        sort_dropdown.connect("notify::selected", lambda *_args: refresh())
         clear_button.connect("clicked", lambda *_args: self._confirm_clear_history(dialog, refresh))
         dialog.present(self)
 
