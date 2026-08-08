@@ -36,7 +36,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noq
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
-APP_VERSION = "1.2"
+APP_VERSION = "1.3"
 
 BIN = "speedtest"
 # Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
@@ -2015,10 +2015,13 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             application_name=APP_NAME,
             application_icon=APP_ID,
             version=APP_VERSION,
-            developer_name="Michele",
+            developer_name="Michele · mikpinky",
             website="https://github.com/mikpinky",
+            issue_url="https://github.com/mikpinky/speedgtk/issues",
         )
         dialog.set_comments(_("A GTK 4 interface for the official Ookla Speedtest CLI."))
+        dialog.set_copyright("© 2026 Michele · mikpinky")
+        dialog.set_license_type(Gtk.License.MIT_X11)
         dialog.present(self)
 
     # ------------------------------------------------------------------
