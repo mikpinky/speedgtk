@@ -26,20 +26,34 @@ GNOME application.
 
 ## Screenshots & Demos
 
-Media assets are organized in [`docs/media/`](docs/media/). The section is
-ready for the following files:
+### Live demos
 
-| Asset | File name |
-| --- | --- |
-| Download demo | `docs/media/download-demo.mp4` |
-| Upload demo | `docs/media/upload-demo.mp4` |
-| Main window screenshot | `docs/media/main-window.png` |
-| History screenshot | `docs/media/history.png` |
+<table>
+  <tr>
+    <th>Download</th>
+    <th>Upload</th>
+  </tr>
+  <tr>
+    <td>
+      <video src="docs/media/download-demo.mp4" controls muted loop playsinline width="280">
+        <a href="docs/media/download-demo.mp4">Watch the download demo</a>
+      </video>
+    </td>
+    <td>
+      <video src="docs/media/upload-demo.mp4" controls muted loop playsinline width="280">
+        <a href="docs/media/upload-demo.mp4">Watch the upload demo</a>
+      </video>
+    </td>
+  </tr>
+</table>
 
-<!-- Replace these slots with embedded media after the files are added. -->
+### Screenshots
 
-<!-- Download demo: docs/media/download-demo.mp4 -->
-<!-- Upload demo: docs/media/upload-demo.mp4 -->
+<p align="center">
+  <img src="docs/media/main-window-at-launch.png" width="250" alt="SpeedGTK at launch">
+  <img src="docs/media/test-complete-main-windows.png" width="250" alt="SpeedGTK after a completed test">
+  <img src="docs/media/history.png" width="250" alt="SpeedGTK history">
+</p>
 
 ## Requirements
 
