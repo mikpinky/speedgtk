@@ -356,6 +356,7 @@ GAUGE_DEFAULT_SCALE = 1
 # Durata dell'inseguimento del valore corrente e del ritorno a zero fra le fasi.
 TRACK_DURATION_MS = 250
 RESET_DURATION_MS = 600
+SCALE_TRANSITION_DURATION_MS = 450
 
 # Sfumature Ookla: azzurro → verde acqua → verde per il download, violetto per
 # l'upload. Ogni stop è (posizione sulla scala 0→1, (r, g, b)).
@@ -621,10 +622,14 @@ def surface_rgb(_widget):
 
 
 def accent_rgb(widget):
-    """Colore di accento del sistema, con ripiego sulle versioni più vecchie."""
+    """Colore di accento pieno del sistema, con ripiego sulle API meno recenti."""
     manager = Adw.StyleManager.get_default()
     if hasattr(manager, "get_accent_color"):
-        rgba = manager.get_accent_color().to_standalone_rgba(manager.get_dark())
+        accent = manager.get_accent_color()
+        # to_standalone_rgba() aumenta intenzionalmente il contrasto: in tema
+        # scuro trasforma rosso/magenta in un rosa chiaro. Per frecce e arco
+        # disegnati su misura vogliamo invece il colore saturo scelto dal tema.
+        rgba = accent.to_rgba() if hasattr(accent, "to_rgba") else accent.to_standalone_rgba(False)
         return (rgba.red, rgba.green, rgba.blue)
     ok, rgba = widget.get_style_context().lookup_color("accent_color")
     if ok:
@@ -647,7 +652,9 @@ def gradient_stops(widget, phase, use_accent):
     """
     if use_accent:
         base = accent_rgb(widget)
-        return ((0.0, shade(base, 0.70)), (0.55, base), (1.0, shade(base, 1.45)))
+        # Manteniamo profondità senza mescolare il colore con il bianco: quello
+        # renderebbe l'accento troppo pastello, soprattutto sul tema scuro.
+        return ((0.0, shade(base, 0.82)), (0.55, base), (1.0, shade(base, 0.92)))
     return STOPS_UPLOAD if phase == "upload" else STOPS_DOWNLOAD
 
 
@@ -719,9 +726,21 @@ class SpeedGauge(Gtk.DrawingArea):
     HUB_OUTER = 0.028
     HUB_INNER = 0.013
     VALUE_SIZE = 0.098
-    VALUE_OFFSET = 0.190
+    VALUE_OFFSET = 0.223
     UNIT_SIZE = 0.048
     UNIT_OFFSET = 0.335
+
+    # Ritocchi della scala fino a 1 Gbps. Modifica liberamente le coppie
+    # (orizzontale, verticale): ogni unità corrisponde alla larghezza media di
+    # una lettera dell'etichetta, con x positivo verso est e y verso sud.
+    STANDARD_TICK_OFFSETS = {
+        0: (-0.354, 0.354),
+        1: (-0.650, 0.140),
+        5: (-0.400, -0.125),
+        10: (-0.150, -0.250),
+        25: (0.000, -0.450),
+        50: (0.130, -0.310),
+    }
 
     # Offset in "larghezze di lettera" per le tacche della sola scala 10 Gbps.
     # La scala logaritmica mette alcuni numeri particolarmente vicini ai tagli;
@@ -729,9 +748,9 @@ class SpeedGauge(Gtk.DrawingArea):
     EXTENDED_TICK_OFFSETS = {
         0: (-0.354, 0.354),       # mezza lettera a sud-ovest
         1: (-0.462, 0.191),       # mezza lettera verso ovest-sud-ovest
-        5: (-0.500, 0.000),       # mezza lettera a ovest
+        5: (-0.700, 0.000),       # mezza lettera a ovest
         50: (0.000, -0.250),      # un quarto a nord
-        100: (0.000, -0.250),     # un quarto a nord
+        100: (0.000, -0.300),     # un quarto a nord
         300: (-0.088, -0.088),    # un ottavo a nord-ovest
         2500: (-0.500, 0.000),    # mezza lettera a ovest
     }
@@ -744,6 +763,8 @@ class SpeedGauge(Gtk.DrawingArea):
         self._color_phase = "download"  # fase da cui prendere i colori dell'arco
         self._settling = False  # ritorno a zero fra due fasi in corso
         self._scale_index = GAUGE_DEFAULT_SCALE
+        self._scale_from_index = None
+        self._scale_progress = 1.0
         self._use_accent = False
         self._auto_range = True
 
@@ -759,6 +780,16 @@ class SpeedGauge(Gtk.DrawingArea):
         )
         self._animation.set_easing(Adw.Easing.EASE_OUT_CUBIC)
         self._animation.connect("done", self._on_animation_done)
+
+        self._scale_animation = Adw.TimedAnimation.new(
+            self,
+            0.0,
+            1.0,
+            SCALE_TRANSITION_DURATION_MS,
+            Adw.PropertyAnimationTarget.new(self, "scale-progress"),
+        )
+        self._scale_animation.set_easing(Adw.Easing.EASE_IN_OUT_CUBIC)
+        self._scale_animation.connect("done", self._on_scale_animation_done)
 
         # Cambi di tema (chiaro/scuro, colore di accento) → ridisegno.
         manager = Adw.StyleManager.get_default()
@@ -804,6 +835,16 @@ class SpeedGauge(Gtk.DrawingArea):
     @GObject.Property(type=float, default=1000.0, flags=GObject.ParamFlags.READABLE)
     def max_value(self):
         return GAUGE_SCALES[self._scale_index][0]
+
+    @GObject.Property(type=float, default=1.0)
+    def scale_progress(self):
+        """Avanzamento 0→1 dell'animazione fra due scale del tachimetro."""
+        return self._scale_progress
+
+    @scale_progress.setter
+    def scale_progress(self, progress):
+        self._scale_progress = min(max(float(progress), 0.0), 1.0)
+        self.queue_draw()
 
     # ------------------------------------------------------------------
     # Controllo dell'ago
@@ -876,28 +917,43 @@ class SpeedGauge(Gtk.DrawingArea):
         else:
             self.queue_draw()
 
+    def _on_scale_animation_done(self, _animation):
+        self._scale_from_index = None
+        self.props.scale_progress = 1.0
+
     def _grow_range_for(self, speed):
         index = self._scale_index
         while index + 1 < len(GAUGE_SCALES) and speed > GAUGE_SCALES[index][0]:
             index += 1
         if index != self._scale_index:
+            self._scale_from_index = self._scale_index
             self._scale_index = index
             self.notify("max-value")
-            self.queue_draw()
+            self.props.scale_progress = 0.0
+            self._scale_animation.reset()
+            self._scale_animation.play()
 
     # ------------------------------------------------------------------
     # Scala logaritmica
     # ------------------------------------------------------------------
-    def _fraction(self, speed):
+    def _fraction_for_scale(self, speed, scale_index):
         """Posizione 0→1 lungo l'arco.
 
         log10(1 + v) / log10(1 + fondoscala): con la scala lineare tutto ciò che
         sta sotto i 100 Mbps si schiaccerebbe nel primo decimo dell'arco e l'ago
         sembrerebbe fermo. Il +1 tiene lo zero esattamente a inizio scala.
         """
-        top = GAUGE_SCALES[self._scale_index][0]
+        top = GAUGE_SCALES[scale_index][0]
         speed = min(max(speed, 0.0), top)
         return math.log10(1.0 + speed) / math.log10(1.0 + top)
+
+    def _fraction(self, speed):
+        """Posizione corrente, interpolata mentre il fondoscala si espande."""
+        if self._scale_from_index is None:
+            return self._fraction_for_scale(speed, self._scale_index)
+        before = self._fraction_for_scale(speed, self._scale_from_index)
+        after = self._fraction_for_scale(speed, self._scale_index)
+        return before + (after - before) * self._scale_progress
 
     def _angle(self, fraction):
         return math.radians(GAUGE_START_DEG + GAUGE_SWEEP_DEG * fraction)
@@ -964,42 +1020,92 @@ class SpeedGauge(Gtk.DrawingArea):
             cr.stroke()
 
     def _draw_ticks(self, cr, cx, cy, size, r_inner, base):
-        ticks = GAUGE_SCALES[self._scale_index][1]
-        label_radius = r_inner - size * self.LABEL_INSET
-        cr.set_line_width(max(1.0, size * 0.005))
-        for tick in ticks:
-            angle = self._angle(self._fraction(tick))
-            cos_a, sin_a = math.cos(angle), math.sin(angle)
-            outer = r_inner - size * 0.010
-            inner = outer - size * self.TICK_LEN
-            cr.set_source_rgba(*base, 0.30)
-            cr.move_to(cx + cos_a * outer, cy + sin_a * outer)
-            cr.line_to(cx + cos_a * inner, cy + sin_a * inner)
-            cr.stroke()
-            offset_x, offset_y = self._tick_offset(tick, size)
-            draw_text(
-                self,
-                cr,
-                self._tick_label(tick),
-                cx + cos_a * label_radius + offset_x,
-                cy + sin_a * label_radius + offset_y,
-                size * self.LABEL_SIZE,
-                (*base, 0.80),
-                weight=Pango.Weight.BOLD,
-                tabular=True,
-            )
+        if self._scale_from_index is None:
+            for tick in GAUGE_SCALES[self._scale_index][1]:
+                geometry = self._tick_geometry(tick, self._scale_index, size, r_inner)
+                self._draw_tick(cr, cx, cy, size, base, tick, self._scale_index, geometry)
+            return
 
-    def _tick_offset(self, tick, size):
-        """Ritocchi ottici delle etichette sulla sola scala estesa."""
-        if GAUGE_SCALES[self._scale_index][0] <= 1000.0:
-            return 0.0, 0.0
-        horizontal, vertical = self.EXTENDED_TICK_OFFSETS.get(tick, (0.0, 0.0))
+        # Le tacche condivise scorrono lungo l'arco. Quelle solo della vecchia
+        # scala svaniscono, le nuove compaiono gradualmente: niente salti quando
+        # si passa dal fondoscala 1G a quello 10G.
+        before_index = self._scale_from_index
+        before_ticks = set(GAUGE_SCALES[before_index][1])
+        after_ticks = set(GAUGE_SCALES[self._scale_index][1])
+        progress = self._scale_progress
+        for tick in sorted(before_ticks | after_ticks):
+            if tick in before_ticks and tick in after_ticks:
+                before = self._tick_geometry(tick, before_index, size, r_inner)
+                after = self._tick_geometry(tick, self._scale_index, size, r_inner)
+                geometry = tuple(
+                    before_value + (after_value - before_value) * progress
+                    for before_value, after_value in zip(before, after)
+                )
+                self._draw_tick(cr, cx, cy, size, base, tick, self._scale_index, geometry)
+            elif tick in before_ticks:
+                geometry = self._tick_geometry(tick, before_index, size, r_inner)
+                self._draw_tick(
+                    cr, cx, cy, size, base, tick, before_index, geometry, opacity=1.0 - progress
+                )
+            else:
+                geometry = self._tick_geometry(tick, self._scale_index, size, r_inner)
+                self._draw_tick(
+                    cr, cx, cy, size, base, tick, self._scale_index, geometry, opacity=progress
+                )
+
+    def _tick_geometry(self, tick, scale_index, size, r_inner):
+        angle = self._angle(self._fraction_for_scale(tick, scale_index))
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        outer = r_inner - size * 0.010
+        inner = outer - size * self.TICK_LEN
+        label_radius = r_inner - size * self.LABEL_INSET
+        offset_x, offset_y = self._tick_offset(tick, size, scale_index)
+        return (
+            cos_a * outer,
+            sin_a * outer,
+            cos_a * inner,
+            sin_a * inner,
+            cos_a * label_radius + offset_x,
+            sin_a * label_radius + offset_y,
+        )
+
+    def _draw_tick(self, cr, cx, cy, size, base, tick, scale_index, geometry, opacity=1.0):
+        if opacity <= 0.0:
+            return
+        outer_x, outer_y, inner_x, inner_y, label_x, label_y = geometry
+        cr.set_line_width(max(1.0, size * 0.005))
+        cr.set_source_rgba(*base, 0.30 * opacity)
+        cr.move_to(cx + outer_x, cy + outer_y)
+        cr.line_to(cx + inner_x, cy + inner_y)
+        cr.stroke()
+        draw_text(
+            self,
+            cr,
+            self._tick_label(tick, scale_index),
+            cx + label_x,
+            cy + label_y,
+            size * self.LABEL_SIZE,
+            (*base, 0.80 * opacity),
+            weight=Pango.Weight.BOLD,
+            tabular=True,
+        )
+
+    def _tick_offset(self, tick, size, scale_index=None):
+        """Ritocchi ottici delle etichette, esposti nelle due tabelle sopra."""
+        if scale_index is None:
+            scale_index = self._scale_index
+        if GAUGE_SCALES[scale_index][0] <= 1000.0:
+            horizontal, vertical = self.STANDARD_TICK_OFFSETS.get(tick, (0.0, 0.0))
+        else:
+            horizontal, vertical = self.EXTENDED_TICK_OFFSETS.get(tick, (0.0, 0.0))
         letter_width = size * self.LABEL_SIZE * 0.62
         return horizontal * letter_width, vertical * letter_width
 
-    def _tick_label(self, tick):
+    def _tick_label(self, tick, scale_index=None):
         """Etichetta breve per le velocità multi-gigabit della scala estesa."""
-        if GAUGE_SCALES[self._scale_index][0] > 1000.0 and tick in (1000, 2500, 5000, 10000):
+        if scale_index is None:
+            scale_index = self._scale_index
+        if GAUGE_SCALES[scale_index][0] > 1000.0 and tick in (1000, 2500, 5000, 10000):
             decimals = 1 if tick == 2500 else 0
             return "{}G".format(format_number(tick / 1000, decimals))
         return format_number(tick, 0)
@@ -1181,7 +1287,7 @@ class LatencyIcon(Gtk.DrawingArea):
         text = text_rgba(self)
 
         if self._active:
-            if self._phase == "idle":
+            if self._phase == "idle" and not self._use_accent:
                 color = (*self.IDLE_COLOR, 1.0)
             else:
                 color = (*rgb_at(gradient_stops(self, self._phase, self._use_accent), 0.5), 1.0)
@@ -1712,6 +1818,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._gauge.props.auto_range = bool(self._settings["auto_range"])
         self._download_icon.set_use_accent_color(accent)
         self._upload_icon.set_use_accent_color(accent)
+        self._idle_ping_icon.set_use_accent_color(accent)
         self._download_ping_icon.set_use_accent_color(accent)
         self._upload_ping_icon.set_use_accent_color(accent)
         self._progress.set_use_accent_color(accent)
