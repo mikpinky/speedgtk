@@ -11,6 +11,7 @@ Use these names so the README can be updated without changing its structure:
 - `main-window-at-launch.png` — SpeedGTK at launch.
 - `test-complete-main-windows.png` — completed test view.
 - `history.png` — history dialog.
+- `settings.png` — preferences dialog.
 
 For demos, use MP4 with the H.264 video codec as source and create an
 optimized GIF for the README preview. Keep each video short and compressed for

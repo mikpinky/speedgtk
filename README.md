@@ -51,12 +51,18 @@ GNOME application.
   <tr>
     <td><img src="docs/media/main-window-at-launch.png" width="250" alt="SpeedGTK at launch"></td>
     <td><img src="docs/media/test-complete-main-windows.png" width="250" alt="SpeedGTK after a completed test"></td>
-    <td><img src="docs/media/history.png" width="250" alt="SpeedGTK history"></td>
   </tr>
   <tr>
     <td align="center"><sub>Ready</sub></td>
     <td align="center"><sub>Result</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/history.png" width="250" alt="SpeedGTK history"></td>
+    <td><img src="docs/media/settings.png" width="250" alt="SpeedGTK settings"></td>
+  </tr>
+  <tr>
     <td align="center"><sub>History</sub></td>
+    <td align="center"><sub>Settings</sub></td>
   </tr>
 </table>
 
