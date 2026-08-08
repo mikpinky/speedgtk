@@ -1337,7 +1337,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._details_group.add(self._result_row)
         self._details_revealer = Gtk.Revealer()
         self._details_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
-        self._details_revealer.set_transition_duration(280)
+        self._details_revealer.set_transition_duration(600)
         self._details_revealer.set_child(self._details_group)
         box.append(self._details_revealer)
 
