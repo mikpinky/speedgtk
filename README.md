@@ -99,6 +99,13 @@ To remove a user installation:
 make uninstall-user
 ```
 
+This removes the user installation, saved history, preferences and the stored
+Ookla terms acceptance.
+
+When removing a system-wide installation with `sudo make uninstall`, SpeedGTK
+resets the stored terms acceptance for the user who invoked `sudo`, while
+leaving that user's other preferences intact.
+
 ## Development
 
 Run the basic syntax check with:
@@ -110,6 +117,15 @@ make check
 Translations are stored in [`po/`](po/). The project intentionally depends on
 the official Ookla CLI rather than the unrelated Python `speedtest-cli`
 utility, whose output format is incompatible with this application.
+
+## Ookla notice
+
+SpeedGTK is an independent project and is not affiliated with, endorsed by or
+sponsored by Ookla. It does not bundle the Speedtest CLI: each user installs
+the official command separately. On first launch, SpeedGTK asks the user to
+review and explicitly accept Ookla's [End User License Agreement](https://www.speedtest.net/about/eula),
+[Terms of Use](https://www.speedtest.net/about/terms) and
+[Privacy Policy](https://www.speedtest.net/about/privacy) before running it.
 
 ## Support
 

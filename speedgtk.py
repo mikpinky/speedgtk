@@ -36,14 +36,14 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noq
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
-APP_VERSION = "1.5"
+APP_VERSION = "1.6"
 
 BIN = "speedtest"
 # Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
 # Ookla dal vecchio script Python `speedtest-cli`, che ha CLI e output diversi.
 OOKLA_SIGNATURE = "Speedtest by Ookla"
-# Flag non documentati in --help ma accettati: evitano il prompt interattivo di
-# licenza/GDPR alla prima esecuzione (che altrimenti bloccherebbe il processo).
+# Flag accettati dalla CLI dopo che l'utente ha dato il consenso esplicito
+# nell'app: evitano il prompt interattivo su stdin.
 ACCEPT_FLAGS = ["--accept-license", "--accept-gdpr"]
 # Il flag accetta 100–1000 ms (verificato con `speedtest --help`).
 PROGRESS_INTERVAL_MS = 100
@@ -391,6 +391,7 @@ class Settings:
         "color_scheme": "system",
         "keep_history": True,
         "language": "system",
+        "ookla_terms_accepted": False,
         "last_auto_server": None,  # descrizione dell'ultimo server scelto in automatico
     }
 
@@ -1588,6 +1589,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._refresh_button = Gtk.Button(
             icon_name="view-refresh-symbolic", tooltip_text=_("Refresh the server list")
         )
+        self._refresh_button.set_sensitive(False)
         self._refresh_button.connect("clicked", lambda *_args: self._load_servers())
         header.pack_start(self._refresh_button)
 
@@ -1625,7 +1627,10 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
         self._apply_appearance()
         self.connect("close-request", self._on_close_request)
-        self._check_binary()
+        if self._settings["ookla_terms_accepted"]:
+            self._check_binary()
+        else:
+            self._present_ookla_terms()
 
     # ------------------------------------------------------------------
     # Costruzione della UI
@@ -1636,6 +1641,63 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             title=_("Checking speedtest…"),
             description=_("Looking for the official Ookla CLI."),
         )
+
+    def _present_ookla_terms(self):
+        """Richiede consenso esplicito prima di passare gli --accept-* alla CLI."""
+        dialog = Adw.Dialog(title=_("Use of the Ookla Speedtest CLI"), content_width=460)
+        dialog.set_can_close(False)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content.set_margin_top(24)
+        content.set_margin_bottom(24)
+        content.set_margin_start(24)
+        content.set_margin_end(24)
+
+        description = Gtk.Label(
+            label=_(
+                "SpeedGTK uses Ookla's official Speedtest CLI. Before continuing, please "
+                "read and accept Ookla's End User License Agreement, Terms of Use and "
+                "Privacy Policy."
+            ),
+            wrap=True,
+            xalign=0.0,
+        )
+        description.set_wrap_mode(Pango.WrapMode.WORD_CHAR)
+        content.append(description)
+
+        links = (
+            (_("End User License Agreement"), "https://www.speedtest.net/about/eula"),
+            (_("Terms of Use"), "https://www.speedtest.net/about/terms"),
+            (_("Privacy Policy"), "https://www.speedtest.net/about/privacy"),
+        )
+        for label, uri in links:
+            link = Gtk.LinkButton(uri=uri, label=label)
+            link.set_halign(Gtk.Align.START)
+            content.append(link)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        actions.set_halign(Gtk.Align.END)
+        quit_button = Gtk.Button(label=_("Quit"))
+        accept_button = Gtk.Button(label=_("Accept and continue"))
+        accept_button.add_css_class("suggested-action")
+
+        def decline(_button):
+            dialog.force_close()
+            self.get_application().quit()
+
+        def accept(_button):
+            self._settings.set("ookla_terms_accepted", True)
+            dialog.force_close()
+            self._check_binary()
+
+        quit_button.connect("clicked", decline)
+        accept_button.connect("clicked", accept)
+        actions.append(quit_button)
+        actions.append(accept_button)
+        content.append(actions)
+
+        dialog.set_child(content)
+        dialog.present(self)
 
     def _build_main_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
@@ -2270,7 +2332,13 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     # ------------------------------------------------------------------
     # Controllo iniziale del binario
     # ------------------------------------------------------------------
+    def _accepted_cli_flags(self):
+        """Restituisce i flag di consenso solo dopo l'azione esplicita dell'utente."""
+        return ACCEPT_FLAGS if self._settings["ookla_terms_accepted"] else []
+
     def _check_binary(self):
+        if not self._settings["ookla_terms_accepted"]:
+            return
         self._stack.set_visible_child_name("loading")
         self._refresh_button.set_sensitive(False)
         if GLib.find_program_in_path(BIN) is None:
@@ -2372,16 +2440,18 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     # Elenco dei server
     # ------------------------------------------------------------------
     def _load_servers(self):
+        if not self._settings["ookla_terms_accepted"]:
+            return
         if self._servers_cancellable is not None:
             self._servers_cancellable.cancel()
         self._servers_cancellable = Gio.Cancellable()
 
         self._refresh_button.set_sensitive(False)
         self._server_row.set_subtitle(_("Loading the list…"))
-        # Gli --accept-* servono anche qui: senza, alla prima esecuzione la CLI
-        # aspetterebbe la conferma della licenza su stdin.
+        # Il consenso è stato richiesto esplicitamente prima del controllo
+        # della CLI; i flag evitano ora il prompt interattivo su stdin.
         run_and_capture(
-            [BIN, "--servers", "--format=json"] + ACCEPT_FLAGS,
+            [BIN, "--servers", "--format=json"] + self._accepted_cli_flags(),
             self._on_servers_done,
             self._servers_cancellable,
         )
@@ -2517,6 +2587,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     # Avvio / annullamento del test
     # ------------------------------------------------------------------
     def _on_start_clicked(self, _button):
+        if not self._settings["ookla_terms_accepted"]:
+            return
         if self._run is not None:
             self._set_phase("cancel", _("Cancelling…"))
             self._start_button.set_sensitive(False)  # riabilitato in _on_run_done
@@ -2533,7 +2605,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             BIN,
             "--format=jsonl",
             f"--progress-update-interval={PROGRESS_INTERVAL_MS}",
-        ] + ACCEPT_FLAGS
+        ] + self._accepted_cli_flags()
         if server_id is not None:
             argv += ["-s", server_id]
         self._auto_server = server_id is None

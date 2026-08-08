@@ -6,6 +6,7 @@ DATADIR := $(PREFIX)/share/$(APP_NAME)
 BINDIR := $(PREFIX)/bin
 APPLICATIONSDIR := $(PREFIX)/share/applications
 ICONDIR := $(PREFIX)/share/icons/hicolor/scalable/apps
+USER_CONFIG_DIR ?= $(or $(XDG_CONFIG_HOME),$(HOME)/.config)
 
 .PHONY: all install install-user uninstall uninstall-user check
 
@@ -36,8 +37,16 @@ uninstall:
 		"$(DESTDIR)$(APPLICATIONSDIR)/$(APP_ID).desktop" \
 		"$(DESTDIR)$(ICONDIR)/$(APP_ID).svg"
 	rm -rf "$(DESTDIR)$(DATADIR)"
+	@if [ -n "$(SUDO_USER)" ]; then \
+		user_home="$$(getent passwd "$(SUDO_USER)" | cut -d: -f6)"; \
+		settings="$$user_home/.config/speedgtk/settings.json"; \
+		if [ -f "$$settings" ]; then \
+			sed -i 's/"ookla_terms_accepted"[[:space:]]*:[[:space:]]*true/"ookla_terms_accepted": false/' "$$settings"; \
+		fi; \
+	fi
 
 uninstall-user:
 	$(MAKE) uninstall PREFIX="$(HOME)/.local"
+	rm -rf "$(USER_CONFIG_DIR)/speedgtk"
 	@command -v update-desktop-database >/dev/null && update-desktop-database "$(HOME)/.local/share/applications" || true
 	@command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -f -t "$(HOME)/.local/share/icons/hicolor" || true
