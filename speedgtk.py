@@ -35,6 +35,8 @@ gi.require_version("PangoCairo", "1.0")
 from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noqa: E402
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
+APP_NAME = "SpeedGTK"
+APP_VERSION = "1.1"
 
 BIN = "speedtest"
 # Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
@@ -98,6 +100,12 @@ HISTORY_SORTS = (
     ("upload", N_("Best upload")),
     ("ping", N_("Best ping")),
     ("overall", N_("Best overall")),
+)
+
+THEME_OPTIONS = (
+    ("system", N_("Same as the system")),
+    ("light", N_("Light")),
+    ("dark", N_("Dark")),
 )
 
 # La maggior parte dell'uso quotidiano della connessione dipende dal download,
@@ -341,7 +349,7 @@ GAUGE_SWEEP_DEG = 270.0
 GAUGE_SCALES = (
     (100.0, (0, 1, 5, 10, 25, 50, 100)),
     (1000.0, (0, 1, 5, 10, 25, 50, 100, 250, 500, 1000)),
-    (10000.0, (0, 1, 5, 10, 50, 100, 500, 1000, 5000, 10000)),
+    (10000.0, (0, 1, 5, 10, 20, 50, 100, 300, 500, 1000, 2500, 5000, 10000)),
 )
 GAUGE_DEFAULT_SCALE = 1
 
@@ -379,6 +387,7 @@ class Settings:
         "plain_ui": False,
         "accent_colors": False,
         "auto_range": True,
+        "color_scheme": "system",
         "keep_history": True,
         "language": "system",
         "last_auto_server": None,  # descrizione dell'ultimo server scelto in automatico
@@ -702,7 +711,7 @@ class SpeedGauge(Gtk.DrawingArea):
     R_OUTER = 0.470
     RING = 0.068
     TICK_LEN = 0.028
-    LABEL_INSET = 0.054
+    LABEL_INSET = 0.078
     LABEL_SIZE = 0.042
     NEEDLE_TIP = 0.303
     NEEDLE_TAIL = 0.072
@@ -710,9 +719,22 @@ class SpeedGauge(Gtk.DrawingArea):
     HUB_OUTER = 0.028
     HUB_INNER = 0.013
     VALUE_SIZE = 0.098
-    VALUE_OFFSET = 0.120
+    VALUE_OFFSET = 0.190
     UNIT_SIZE = 0.048
-    UNIT_OFFSET = 0.245
+    UNIT_OFFSET = 0.335
+
+    # Offset in "larghezze di lettera" per le tacche della sola scala 10 Gbps.
+    # La scala logaritmica mette alcuni numeri particolarmente vicini ai tagli;
+    # questi ritocchi li allontanano senza alterare la geometria delle altre scale.
+    EXTENDED_TICK_OFFSETS = {
+        0: (-0.354, 0.354),       # mezza lettera a sud-ovest
+        1: (-0.462, 0.191),       # mezza lettera verso ovest-sud-ovest
+        5: (-0.500, 0.000),       # mezza lettera a ovest
+        50: (0.000, -0.250),      # un quarto a nord
+        100: (0.000, -0.250),     # un quarto a nord
+        300: (-0.088, -0.088),    # un ottavo a nord-ovest
+        2500: (-0.500, 0.000),    # mezza lettera a ovest
+    }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -954,17 +976,33 @@ class SpeedGauge(Gtk.DrawingArea):
             cr.move_to(cx + cos_a * outer, cy + sin_a * outer)
             cr.line_to(cx + cos_a * inner, cy + sin_a * inner)
             cr.stroke()
+            offset_x, offset_y = self._tick_offset(tick, size)
             draw_text(
                 self,
                 cr,
-                format_number(tick, 0),
-                cx + cos_a * label_radius,
-                cy + sin_a * label_radius,
+                self._tick_label(tick),
+                cx + cos_a * label_radius + offset_x,
+                cy + sin_a * label_radius + offset_y,
                 size * self.LABEL_SIZE,
                 (*base, 0.80),
                 weight=Pango.Weight.BOLD,
                 tabular=True,
             )
+
+    def _tick_offset(self, tick, size):
+        """Ritocchi ottici delle etichette sulla sola scala estesa."""
+        if GAUGE_SCALES[self._scale_index][0] <= 1000.0:
+            return 0.0, 0.0
+        horizontal, vertical = self.EXTENDED_TICK_OFFSETS.get(tick, (0.0, 0.0))
+        letter_width = size * self.LABEL_SIZE * 0.62
+        return horizontal * letter_width, vertical * letter_width
+
+    def _tick_label(self, tick):
+        """Etichetta breve per le velocità multi-gigabit della scala estesa."""
+        if GAUGE_SCALES[self._scale_index][0] > 1000.0 and tick in (1000, 2500, 5000, 10000):
+            decimals = 1 if tick == 2500 else 0
+            return "{}G".format(format_number(tick / 1000, decimals))
+        return format_number(tick, 0)
 
     def _draw_needle(self, cr, cx, cy, size, base):
         angle = self._angle(self._fraction(self._value))
@@ -1008,13 +1046,42 @@ class SpeedGauge(Gtk.DrawingArea):
             weight=Pango.Weight.LIGHT,
             tabular=True,
         )
-        if self._phase in ("download", "upload") or self._value > 0.0:
-            unit_color = (*rgb_at(stops, 0.55), 1.0)
-        else:
-            unit_color = (*base, 0.45)
-        draw_text(
-            self, cr, _("Mbps"), cx, cy + size * self.UNIT_OFFSET, size * self.UNIT_SIZE, unit_color
-        )
+        unit = _("Mbps")
+        unit_layout = pango_layout(self, cr, unit, size * self.UNIT_SIZE)
+        unit_width, unit_height = unit_layout.get_pixel_size()
+        marker_size = size * 0.044
+        marker_gap = size * 0.012
+        group_width = marker_size + marker_gap + unit_width
+        marker_x = cx - group_width / 2.0 + marker_size / 2.0
+        unit_y = cy + size * self.UNIT_OFFSET
+        self._draw_readout_marker(cr, marker_x, unit_y, size, stops)
+        cr.set_source_rgba(*base, 0.78)
+        cr.move_to(marker_x + marker_size / 2.0 + marker_gap, unit_y - unit_height / 2.0)
+        PangoCairo.show_layout(cr, unit_layout)
+
+    def _draw_readout_marker(self, cr, cx, cy, size, stops):
+        """Freccia colorata che indica a quale misura appartiene il valore live."""
+        marker_size = size * 0.044
+        radius = marker_size * 0.42
+        color = rgb_at(stops, 0.55)
+        cr.save()
+        cr.new_path()
+        cr.set_source_rgb(*color)
+        cr.set_line_width(max(1.0, marker_size * 0.085))
+        cr.arc(cx, cy, radius, 0, 2 * math.pi)
+        cr.stroke()
+
+        direction = 1.0 if self._color_phase == "download" else -1.0
+        stem = marker_size * 0.20
+        head = marker_size * 0.13
+        cr.new_path()
+        cr.move_to(cx, cy - stem * direction)
+        cr.line_to(cx, cy + stem * direction)
+        cr.move_to(cx - head, cy + (stem - head) * direction)
+        cr.line_to(cx, cy + stem * direction)
+        cr.line_to(cx + head, cy + (stem - head) * direction)
+        cr.stroke()
+        cr.restore()
 
 
 class PhaseIcon(Gtk.DrawingArea):
@@ -1314,7 +1381,7 @@ class SpeedtestRun:
 
 class SpeedGTKWindow(Adw.ApplicationWindow):
     def __init__(self, application, settings, history):
-        super().__init__(application=application, title="SpeedGTK")
+        super().__init__(application=application, title=APP_NAME)
         # Le dimensioni GTK sono in pixel logici: il compositor applica il
         # fattore di scala del monitor, quindi questi 984 px (+20%) restano
         # proporzionati sia su display standard sia su schermi HiDPI/4K.
@@ -1335,7 +1402,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._toasts = Adw.ToastOverlay()
         self.set_content(self._toasts)
 
-        self._window_title = Adw.WindowTitle.new("SpeedGTK", "")
+        self._window_title = Adw.WindowTitle.new(APP_NAME, "")
         header = Adw.HeaderBar()
         header.set_title_widget(self._window_title)
 
@@ -1348,12 +1415,14 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         menu = Gio.Menu()
         menu.append(_("History…"), "win.history")
         menu.append(_("Preferences…"), "win.preferences")
+        menu.append(_("About"), "win.about")
         header.pack_end(
             Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu, tooltip_text=_("Menu"))
         )
         for name, callback in (
             ("history", self._present_history),
             ("preferences", self._present_preferences),
+            ("about", self._present_about),
         ):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", callback)
@@ -1512,7 +1581,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         # Jitter e perdita stanno sotto: i tre valori di latenza restano così
         # leggibili anche nella finestra stretta.
         latency_stats = Gtk.Box(
-            orientation=Gtk.Orientation.HORIZONTAL, spacing=14, halign=Gtk.Align.CENTER
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=20, halign=Gtk.Align.CENTER
         )
         latency_caption = Gtk.Label(label=_("Ping ms"))
         latency_caption.add_css_class("caption")
@@ -1630,6 +1699,14 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     # ------------------------------------------------------------------
     def _apply_appearance(self):
         """Riporta le preferenze su tutti i widget che ne dipendono."""
+        color_schemes = {
+            "system": Adw.ColorScheme.DEFAULT,
+            "light": Adw.ColorScheme.FORCE_LIGHT,
+            "dark": Adw.ColorScheme.FORCE_DARK,
+        }
+        Adw.StyleManager.get_default().set_color_scheme(
+            color_schemes.get(self._settings["color_scheme"], Adw.ColorScheme.DEFAULT)
+        )
         accent = bool(self._settings["accent_colors"])
         self._gauge.props.use_accent_color = accent
         self._gauge.props.auto_range = bool(self._settings["auto_range"])
@@ -1651,6 +1728,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage(title=_("General"), icon_name="preferences-system-symbolic")
 
         appearance = Adw.PreferencesGroup(title=_("Appearance"))
+        appearance.add(self._theme_row())
         appearance.add(
             self._switch_row(
                 _("Classic interface"), _("Text labels only, no gauge"), "plain_ui"
@@ -1729,6 +1807,36 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
         row.connect("notify::selected", changed)
         return row
+
+    def _theme_row(self):
+        model = Gtk.StringList()
+        for _code, label in THEME_OPTIONS:
+            model.append(_(label))
+
+        codes = [code for code, _label in THEME_OPTIONS]
+        current = self._settings["color_scheme"]
+        row = Adw.ComboRow(title=_("Theme"), model=model)
+        row.set_selected(codes.index(current) if current in codes else 0)
+
+        def changed(combo, _pspec):
+            index = combo.get_selected()
+            if index >= len(codes):
+                return
+            self._settings.set("color_scheme", codes[index])
+            self._apply_appearance()
+
+        row.connect("notify::selected", changed)
+        return row
+
+    def _present_about(self, *_args):
+        dialog = Adw.AboutDialog(
+            application_name=APP_NAME,
+            application_icon=APP_ID,
+            version=APP_VERSION,
+            developer_name=_("SpeedGTK contributors"),
+        )
+        dialog.set_comments(_("A GTK 4 interface for the official Ookla Speedtest CLI."))
+        dialog.present(self)
 
     # ------------------------------------------------------------------
     # Storico
