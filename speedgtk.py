@@ -2136,7 +2136,10 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         elif event_type == "ping":
             data = event.get("ping", {})
             self._set_phase("ping", _("Measuring ping…"))
-            self._set_progress(data.get("progress"))
+            # La CLI espone un progresso anche per il ping, che arriva a 100%
+            # in pochi istanti. La barra in basso rappresenta però il
+            # trasferimento dati: mostrarlo qui la faceva sembrare completata
+            # prima ancora che iniziasse il download.
             self._show_latency(data.get("latency"), data.get("jitter"))
 
         elif event_type in ("download", "upload"):
