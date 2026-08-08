@@ -45,6 +45,9 @@ OOKLA_SIGNATURE = "Speedtest by Ookla"
 ACCEPT_FLAGS = ["--accept-license", "--accept-gdpr"]
 # Il flag accetta 100–1000 ms (verificato con `speedtest --help`).
 PROGRESS_INTERVAL_MS = 100
+# Al termine del test la barra resta un attimo piena, poi si libera per non
+# sembrare il risultato persistente di un test ancora in corso.
+PROGRESS_HIDE_DELAY_MS = 600
 # Secondi di grazia fra SIGTERM e SIGKILL quando si annulla un test.
 KILL_GRACE_SECONDS = 3
 
@@ -1237,6 +1240,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._auto_server = True  # il test in corso usa la scelta automatica?
         self._updating_servers = False  # ricostruzione dell'elenco in corso
         self._has_run = False  # almeno un test concluso in questa finestra
+        self._progress_hide_source = None  # timer della barra al termine del test
 
         self._toasts = Adw.ToastOverlay()
         self.set_content(self._toasts)
@@ -2003,6 +2007,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             widget.set_sensitive(not running)
 
     def _reset_results(self):
+        self._cancel_progress_hide()
         self._last_error = None
         self._live = {"download": None, "upload": None}
         self._progress.set_fraction(0.0)
@@ -2173,6 +2178,27 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         # 'done' riporta l'ago a riposo: i valori finali sono in intestazione.
         self._set_phase("done", _("Completed"))
         self._record_result(event)
+        self._schedule_progress_hide()
+
+    def _schedule_progress_hide(self):
+        """Lascia visibile il completamento upload per un breve istante."""
+        self._cancel_progress_hide()
+        self._progress_hide_source = GLib.timeout_add(
+            PROGRESS_HIDE_DELAY_MS, self._hide_finished_progress
+        )
+
+    def _cancel_progress_hide(self):
+        if self._progress_hide_source is not None:
+            GLib.source_remove(self._progress_hide_source)
+            self._progress_hide_source = None
+
+    def _hide_finished_progress(self):
+        self._progress_hide_source = None
+        # Un nuovo test può essere partito mentre il timer era in attesa:
+        # in quel caso la barra appartiene già alla sua nuova fase.
+        if self._phase == "done":
+            self._progress.set_fraction(0.0)
+        return GLib.SOURCE_REMOVE
 
     def _set_server_details(self, server, isp):
         self._remember_auto_server(server)
@@ -2247,6 +2273,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         alert.present(self)
 
     def _on_close_request(self, *_args):
+        self._cancel_progress_hide()
         if self._run is not None:
             self._run.kill()  # niente processi orfani
         return False
