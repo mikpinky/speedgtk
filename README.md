@@ -35,25 +35,30 @@ GNOME application.
   </tr>
   <tr>
     <td>
-      <video src="docs/media/download-demo.mp4" controls muted loop playsinline width="280">
-        <a href="docs/media/download-demo.mp4">Watch the download demo</a>
-      </video>
+      <img src="docs/media/download-demo.gif" width="280" alt="Live download demo"><br>
+      <a href="docs/media/download-demo.mp4">Download MP4</a>
     </td>
     <td>
-      <video src="docs/media/upload-demo.mp4" controls muted loop playsinline width="280">
-        <a href="docs/media/upload-demo.mp4">Watch the upload demo</a>
-      </video>
+      <img src="docs/media/upload-demo.gif" width="280" alt="Live upload demo"><br>
+      <a href="docs/media/upload-demo.mp4">Download MP4</a>
     </td>
   </tr>
 </table>
 
 ### Screenshots
 
-<p align="center">
-  <img src="docs/media/main-window-at-launch.png" width="250" alt="SpeedGTK at launch">
-  <img src="docs/media/test-complete-main-windows.png" width="250" alt="SpeedGTK after a completed test">
-  <img src="docs/media/history.png" width="250" alt="SpeedGTK history">
-</p>
+<table>
+  <tr>
+    <td><img src="docs/media/main-window-at-launch.png" width="250" alt="SpeedGTK at launch"></td>
+    <td><img src="docs/media/test-complete-main-windows.png" width="250" alt="SpeedGTK after a completed test"></td>
+    <td><img src="docs/media/history.png" width="250" alt="SpeedGTK history"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Ready</sub></td>
+    <td align="center"><sub>Result</sub></td>
+    <td align="center"><sub>History</sub></td>
+  </tr>
+</table>
 
 ## Requirements
 
