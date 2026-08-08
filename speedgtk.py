@@ -1321,6 +1321,79 @@ class LatencyIcon(Gtk.DrawingArea):
         cr.stroke()
 
 
+class DetailIcon(Gtk.DrawingArea):
+    """Icona cerchiata per i dettagli di server e provider del risultato."""
+
+    __gtype_name__ = "DetailIcon"
+
+    def __init__(self, kind, size=42, **kwargs):
+        super().__init__(**kwargs)
+        self._kind = kind  # 'server' | 'isp'
+        self.set_content_width(size)
+        self.set_content_height(size)
+        self.set_valign(Gtk.Align.CENTER)
+        self.set_draw_func(self._draw)
+
+    @staticmethod
+    def _rounded_rectangle(cr, x, y, width, height, radius):
+        radius = min(radius, width / 2.0, height / 2.0)
+        cr.new_sub_path()
+        cr.arc(x + width - radius, y + radius, radius, -math.pi / 2.0, 0.0)
+        cr.arc(x + width - radius, y + height - radius, radius, 0.0, math.pi / 2.0)
+        cr.arc(x + radius, y + height - radius, radius, math.pi / 2.0, math.pi)
+        cr.arc(x + radius, y + radius, radius, math.pi, 3.0 * math.pi / 2.0)
+        cr.close_path()
+
+    def _draw(self, _area, cr, width, height):
+        size = min(width, height)
+        if size <= 1:
+            return
+        cx, cy = width / 2.0, height / 2.0
+        text = text_rgba(self)
+
+        cr.set_source_rgba(text.red, text.green, text.blue, 0.38)
+        cr.set_line_width(max(0.75, size * 0.024))
+        cr.arc(cx, cy, size * 0.44, 0, 2 * math.pi)
+        cr.stroke()
+
+        cr.set_source_rgba(text.red, text.green, text.blue, 0.72)
+        cr.set_line_width(max(0.75, size * 0.032))
+        if self._kind == "server":
+            cr.arc(cx, cy - size * 0.105, size * 0.125, 0, 2 * math.pi)
+            cr.stroke()
+            # Busto più basso della testa e schiacciato: la linea resta aperta
+            # e non si sovrappone al cerchio del volto.
+            cr.save()
+            cr.translate(cx, cy + size * 0.235)
+            cr.scale(1.0, 0.55)
+            cr.new_path()
+            cr.arc(0.0, 0.0, size * 0.235, math.pi, 2.0 * math.pi)
+            cr.restore()
+            cr.stroke()
+            return
+
+        # ISP: tre piccoli server, uno centrale sopra due affiancati.
+        # Riduciamo sia ciascun server sia il gruppo attorno al suo centro,
+        # così gli angoli inferiori non sfiorano il bordo del cerchio.
+        box_width = size * 0.23
+        box_height = size * 0.195
+        box_radius = size * 0.028
+        group_scale = 0.80
+        for center_x, center_y in (
+            (cx, cy - size * 0.110 * group_scale),
+            (cx - size * 0.170 * group_scale, cy + size * 0.170 * group_scale),
+            (cx + size * 0.170 * group_scale, cy + size * 0.170 * group_scale),
+        ):
+            x = center_x - box_width / 2.0
+            y = center_y - box_height / 2.0
+            self._rounded_rectangle(cr, x, y, box_width, box_height, box_radius)
+            cr.stroke()
+            cr.new_path()
+            cr.move_to(x + size * 0.035, y + box_height * 0.52)
+            cr.line_to(x + box_width - size * 0.035, y + box_height * 0.52)
+            cr.stroke()
+
+
 class PhaseProgress(Gtk.DrawingArea):
     """Barra di avanzamento con la sfumatura della fase in corso.
 
@@ -1593,10 +1666,12 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._details_group = Adw.PreferencesGroup()
         self._server_detail_row = Adw.ActionRow(title=_("Server used"), subtitle=PLACEHOLDER)
         self._server_detail_row.set_subtitle_selectable(True)
+        self._server_detail_row.add_prefix(DetailIcon("server"))
         self._details_group.add(self._server_detail_row)
 
         self._isp_row = Adw.ActionRow(title=_("ISP"), subtitle=PLACEHOLDER)
         self._isp_row.set_subtitle_selectable(True)
+        self._isp_row.add_prefix(DetailIcon("isp"))
         self._details_group.add(self._isp_row)
 
         self._result_row = Adw.ActionRow(title=_("Online result"))
