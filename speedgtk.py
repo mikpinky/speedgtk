@@ -36,7 +36,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noq
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
-APP_VERSION = "1.3"
+APP_VERSION = "1.5"
 
 BIN = "speedtest"
 # Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
@@ -2305,7 +2305,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
                 "project using unofficial APIs, it takes different options and supports "
                 "neither <tt>--format=jsonl</tt> nor the live progress updates this app "
                 "is built on.\n\n"
-                "Remove the old one and install the official one:"
+                "On Debian-derived distributions, remove the old one and install the "
+                "official one with:"
             )
         else:
             title = _("Ookla's `speedtest` CLI was not found")
@@ -2315,7 +2316,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
                 "Careful not to mix it up with <tt>speedtest-cli</tt>, the old "
                 "third-party Python script: same name, but different options and output, "
                 "and no <tt>--format=jsonl</tt>.\n\n"
-                "To install the official one on Ubuntu/Debian:"
+                "On Debian-derived distributions, you can install the official one with:"
             )
 
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -2333,6 +2334,13 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         )
         commands.add_css_class("monospace")
         content.append(commands)
+
+        other_distributions = Gtk.LinkButton(
+            uri="https://www.speedtest.net/apps/cli",
+            label=_("Installation instructions for other distributions"),
+        )
+        other_distributions.set_halign(Gtk.Align.CENTER)
+        content.append(other_distributions)
 
         if output:
             got = Gtk.Label(

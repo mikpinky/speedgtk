@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SpeedGTK 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-08 18:52+0200\n"
+"POT-Creation-Date: 2026-08-08 19:00+0200\n"
 "PO-Revision-Date: 2026-08-08 12:00+0000\n"
 "Last-Translator: SpeedGTK contributors\n"
 "Language-Team: French\n"
@@ -171,11 +171,11 @@ msgstr "%d/%m/%Y %H:%M"
 msgid "Speedtest CLI"
 msgstr "Speedtest CLI"
 
-#: speedgtk.py:1155 speedgtk.py:1807 speedgtk.py:2208 speedgtk.py:2615
+#: speedgtk.py:1155 speedgtk.py:1807 speedgtk.py:2208 speedgtk.py:2623
 msgid "Mbps"
 msgstr "Mb/s"
 
-#: speedgtk.py:1589 speedgtk.py:2396
+#: speedgtk.py:1589 speedgtk.py:2404
 msgid "Refresh the server list"
 msgstr "Actualiser la liste des serveurs"
 
@@ -203,7 +203,7 @@ msgstr "Vérification de speedtest…"
 msgid "Looking for the official Ookla CLI."
 msgstr "Recherche de la CLI officielle d'Ookla."
 
-#: speedgtk.py:1655 speedgtk.py:2548
+#: speedgtk.py:1655 speedgtk.py:2556
 msgid "Start test"
 msgstr "Lancer le test"
 
@@ -219,7 +219,7 @@ msgstr "FAI"
 msgid "Online result"
 msgstr "Résultat en ligne"
 
-#: speedgtk.py:1678 speedgtk.py:2095 speedgtk.py:2753
+#: speedgtk.py:1678 speedgtk.py:2095 speedgtk.py:2761
 msgid "Open"
 msgstr "Ouvrir"
 
@@ -428,7 +428,7 @@ msgstr ""
 "Les résultats enregistrés sur cet ordinateur seront supprimés. Les tests "
 "restent consultables via leurs liens speedtest.net."
 
-#: speedgtk.py:2235 speedgtk.py:2544
+#: speedgtk.py:2235 speedgtk.py:2552
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -450,24 +450,25 @@ msgid ""
 "neither <tt>--format=jsonl</tt> nor the live progress updates this app is "
 "built on.\n"
 "\n"
-"Remove the old one and install the official one:"
+"On Debian-derived distributions, remove the old one and install the official "
+"one with:"
 msgstr ""
-"La commande <tt>speedtest</tt> présente sur ce système n'est pas la CLI "
-"officielle d'Ookla, mais presque certainement l'ancien script Python "
+"La commande <tt>speedtest</tt> de ce système n'est pas la CLI officielle "
+"d'Ookla, mais presque certainement l'ancien script Python "
 "<tt>speedtest-cli</tt>.\n"
 "\n"
 "Ce sont deux programmes différents : <tt>speedtest-cli</tt> est un projet "
-"tiers qui utilise des API non officielles, prend d'autres options et ne "
-"prend en charge ni <tt>--format=jsonl</tt> ni les mises à jour de "
-"progression en temps réel sur lesquelles repose cette application.\n"
+"tiers utilisant des API non officielles, avec des options différentes et sans "
+"<tt>--format=jsonl</tt> ni mises à jour de progression en direct.\n"
 "\n"
-"Supprimez l'ancienne et installez l'officielle :"
+"Sur les distributions dérivées de Debian, supprimez l'ancienne version et "
+"installez l'officielle avec :"
 
-#: speedgtk.py:2311
+#: speedgtk.py:2312
 msgid "Ookla's `speedtest` CLI was not found"
 msgstr "La CLI `speedtest` d'Ookla est introuvable"
 
-#: speedgtk.py:2313
+#: speedgtk.py:2314
 msgid ""
 "This app is a frontend for Ookla's <b>official</b> CLI, which is not "
 "installed.\n"
@@ -476,130 +477,135 @@ msgid ""
 "Python script: same name, but different options and output, and no <tt>--"
 "format=jsonl</tt>.\n"
 "\n"
-"To install the official one on Ubuntu/Debian:"
+"On Debian-derived distributions, you can install the official one with:"
 msgstr ""
 "Cette application est une interface pour la CLI <b>officielle</b> d'Ookla, "
 "qui n'est pas installée.\n"
 "\n"
-"À ne pas confondre avec <tt>speedtest-cli</tt>, l'ancien script Python "
-"tiers : même nom, mais options et sortie différentes, et pas de <tt>--"
-"format=jsonl</tt>.\n"
+"À ne pas confondre avec <tt>speedtest-cli</tt>, l'ancien script Python tiers : "
+"même nom, mais options et sortie différentes, et pas de "
+"<tt>--format=jsonl</tt>.\n"
 "\n"
-"Pour installer l'officielle sur Ubuntu/Debian :"
+"Sur les distributions dérivées de Debian, vous pouvez installer l'officielle "
+"avec :"
 
-#: speedgtk.py:2339
+#: speedgtk.py:2340
+msgid "Installation instructions for other distributions"
+msgstr "Instructions d'installation pour les autres distributions"
+
+#: speedgtk.py:2347
 #, python-brace-format
 msgid "Output received: {output}"
 msgstr "Sortie obtenue : {output}"
 
-#: speedgtk.py:2348
+#: speedgtk.py:2356
 msgid "Try again"
 msgstr "Réessayer"
 
-#: speedgtk.py:2372
+#: speedgtk.py:2380
 msgid "Loading the list…"
 msgstr "Chargement de la liste…"
 
-#: speedgtk.py:2395
+#: speedgtk.py:2403
 msgid "Could not load the servers"
 msgstr "Impossible de charger les serveurs"
 
-#: speedgtk.py:2402
+#: speedgtk.py:2410
 #, python-brace-format
 msgid "Refresh the server list — nearby: {count}"
 msgstr "Actualiser la liste des serveurs — à proximité : {count}"
 
-#: speedgtk.py:2421 speedgtk.py:2793
+#: speedgtk.py:2429 speedgtk.py:2801
 msgid "id"
 msgstr "id"
 
-#: speedgtk.py:2436 speedgtk.py:2437
+#: speedgtk.py:2444 speedgtk.py:2445
 msgid "Automatic"
 msgstr "Automatique"
 
-#: speedgtk.py:2439
+#: speedgtk.py:2447
 #, python-brace-format
 msgid "Last one: {server}"
 msgstr "Dernier : {server}"
 
-#: speedgtk.py:2441
+#: speedgtk.py:2449
 msgid "Picked by speedtest, by latency"
 msgstr "Choisi par speedtest, selon la latence"
 
-#: speedgtk.py:2480
+#: speedgtk.py:2488
 msgid "Ignored: a manual ID is set"
 msgstr "Ignoré : un ID manuel est défini"
 
-#: speedgtk.py:2500
+#: speedgtk.py:2508
 msgid "The manual server ID must be a number"
 msgstr "L'ID de serveur manuel doit être un nombre"
 
-#: speedgtk.py:2513
+#: speedgtk.py:2521
 msgid "Cancelling…"
 msgstr "Annulation…"
 
-#: speedgtk.py:2537
+#: speedgtk.py:2545
 msgid "Cannot start speedtest"
 msgstr "Impossible de lancer speedtest"
 
-#: speedgtk.py:2548
+#: speedgtk.py:2556
 msgid "Repeat test"
 msgstr "Refaire le test"
 
-#: speedgtk.py:2559
+#: speedgtk.py:2567
 msgid "Starting…"
 msgstr "Démarrage…"
 
-#: speedgtk.py:2661
+#: speedgtk.py:2669
 msgid "not available"
 msgstr "non disponible"
 
-#: speedgtk.py:2704
+#: speedgtk.py:2712
 msgid "Test started…"
 msgstr "Test lancé…"
 
-#: speedgtk.py:2709
+#: speedgtk.py:2717
 msgid "Measuring ping…"
 msgstr "Mesure du ping…"
 
-#: speedgtk.py:2721
+#: speedgtk.py:2729
 msgid "Download…"
 msgstr "Téléchargement…"
 
-#: speedgtk.py:2721
+#: speedgtk.py:2729
 msgid "Upload…"
 msgstr "Téléversement…"
 
-#: speedgtk.py:2761
+#: speedgtk.py:2769
 msgid "Completed"
 msgstr "Terminé"
 
-#: speedgtk.py:2815 speedgtk.py:2817
+#: speedgtk.py:2823 speedgtk.py:2825
 msgid "Test cancelled"
 msgstr "Test annulé"
 
-#: speedgtk.py:2822 speedgtk.py:2832
+#: speedgtk.py:2830 speedgtk.py:2840
 msgid "Error"
 msgstr "Erreur"
 
-#: speedgtk.py:2830
+#: speedgtk.py:2838
 #, python-brace-format
 msgid "speedtest exited with code {code}"
 msgstr "speedtest s'est terminé avec le code {code}"
 
-#: speedgtk.py:2845
+#: speedgtk.py:2853
 msgid "Details"
 msgstr "Détails"
 
-#: speedgtk.py:2851
+#: speedgtk.py:2859
 msgid "speedtest error"
 msgstr "Erreur de speedtest"
 
-#: speedgtk.py:2852
+#: speedgtk.py:2860
 msgid "Close"
 msgstr "Fermer"
 
-#: speedgtk.py:2896
+#: speedgtk.py:2904
 msgid ""
 "Usage: speedgtk.py [options]\n"
 "\n"
@@ -620,6 +626,47 @@ msgstr ""
 "Les deux options ne valent que pour ce démarrage ; les réglages durables "
 "sont\n"
 "dans les Préférences (Ctrl+,). Historique des tests : Ctrl+H.\n"
+
+#~ msgid ""
+#~ "The <tt>speedtest</tt> command on this system is not Ookla's official "
+#~ "CLI, but almost certainly the old Python script <tt>speedtest-cli</tt>.\n"
+#~ "\n"
+#~ "They are two different programs: <tt>speedtest-cli</tt> is a third-party "
+#~ "project using unofficial APIs, it takes different options and supports "
+#~ "neither <tt>--format=jsonl</tt> nor the live progress updates this app is "
+#~ "built on.\n"
+#~ "\n"
+#~ "Remove the old one and install the official one:"
+#~ msgstr ""
+#~ "La commande <tt>speedtest</tt> présente sur ce système n'est pas la CLI "
+#~ "officielle d'Ookla, mais presque certainement l'ancien script Python "
+#~ "<tt>speedtest-cli</tt>.\n"
+#~ "\n"
+#~ "Ce sont deux programmes différents : <tt>speedtest-cli</tt> est un projet "
+#~ "tiers qui utilise des API non officielles, prend d'autres options et ne "
+#~ "prend en charge ni <tt>--format=jsonl</tt> ni les mises à jour de "
+#~ "progression en temps réel sur lesquelles repose cette application.\n"
+#~ "\n"
+#~ "Supprimez l'ancienne et installez l'officielle :"
+
+#~ msgid ""
+#~ "This app is a frontend for Ookla's <b>official</b> CLI, which is not "
+#~ "installed.\n"
+#~ "\n"
+#~ "Careful not to mix it up with <tt>speedtest-cli</tt>, the old third-party "
+#~ "Python script: same name, but different options and output, and no <tt>--"
+#~ "format=jsonl</tt>.\n"
+#~ "\n"
+#~ "To install the official one on Ubuntu/Debian:"
+#~ msgstr ""
+#~ "Cette application est une interface pour la CLI <b>officielle</b> "
+#~ "d'Ookla, qui n'est pas installée.\n"
+#~ "\n"
+#~ "À ne pas confondre avec <tt>speedtest-cli</tt>, l'ancien script Python "
+#~ "tiers : même nom, mais options et sortie différentes, et pas de <tt>--"
+#~ "format=jsonl</tt>.\n"
+#~ "\n"
+#~ "Pour installer l'officielle sur Ubuntu/Debian :"
 
 #~ msgid "Legal notices"
 #~ msgstr "Mentions légales"
