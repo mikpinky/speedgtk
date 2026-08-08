@@ -92,6 +92,20 @@ def N_(message):
     return message
 
 
+HISTORY_SORTS = (
+    ("date", N_("Sort by date (default)")),
+    ("download", N_("Best download")),
+    ("upload", N_("Best upload")),
+    ("ping", N_("Best ping")),
+    ("overall", N_("Best overall")),
+)
+
+# La maggior parte dell'uso quotidiano della connessione dipende dal download,
+# ma l'upload resta abbastanza rilevante da incidere sulla classifica finale.
+OVERALL_DOWNLOAD_WEIGHT = 0.7
+OVERALL_UPLOAD_WEIGHT = 0.3
+
+
 def po_unquote(token):
     """Toglie le virgolette e le sequenze di escape di una stringa .po."""
     token = token.strip()
@@ -1061,6 +1075,79 @@ class PhaseIcon(Gtk.DrawingArea):
         cr.stroke()
 
 
+class LatencyIcon(Gtk.DrawingArea):
+    """Indicatore della latenza idle, in download o in upload.
+
+    Il ping idle usa le frecce orizzontali gialle; durante i trasferimenti le
+    frecce verticali riusano i colori verde acqua e violetto delle rispettive
+    intestazioni. Rimangono attenuati finché non arriva una misura.
+    """
+
+    __gtype_name__ = "LatencyIcon"
+
+    IDLE_COLOR = (0.90, 0.76, 0.00)
+
+    def __init__(self, phase, size=22, **kwargs):
+        super().__init__(**kwargs)
+        self._phase = phase  # 'idle' | 'download' | 'upload'
+        self._active = False
+        self._use_accent = False
+        self.set_content_width(size)
+        self.set_content_height(size)
+        self.set_valign(Gtk.Align.CENTER)
+        self.set_draw_func(self._draw)
+
+    def set_active(self, active):
+        if active != self._active:
+            self._active = bool(active)
+            self.queue_draw()
+
+    def set_use_accent_color(self, enabled):
+        self._use_accent = bool(enabled)
+        self.queue_draw()
+
+    def _draw(self, _area, cr, width, height):
+        size = min(width, height)
+        if size <= 1:
+            return
+        cx, cy = width / 2.0, height / 2.0
+        text = text_rgba(self)
+
+        if self._active:
+            if self._phase == "idle":
+                color = (*self.IDLE_COLOR, 1.0)
+            else:
+                color = (*rgb_at(gradient_stops(self, self._phase, self._use_accent), 0.5), 1.0)
+        else:
+            color = (text.red, text.green, text.blue, 0.35)
+
+        cr.set_source_rgba(*color)
+        cr.set_line_width(max(1.0, size * 0.085))
+        radius = size * 0.42
+        cr.arc(cx, cy, radius, 0, 2 * math.pi)
+        cr.stroke()
+
+        stem = size * 0.20
+        head = size * 0.13
+        if self._phase == "idle":
+            cr.move_to(cx - stem, cy)
+            cr.line_to(cx + stem, cy)
+            cr.move_to(cx - stem + head, cy - head)
+            cr.line_to(cx - stem, cy)
+            cr.line_to(cx - stem + head, cy + head)
+            cr.move_to(cx + stem - head, cy - head)
+            cr.line_to(cx + stem, cy)
+            cr.line_to(cx + stem - head, cy + head)
+        else:
+            direction = 1.0 if self._phase == "download" else -1.0
+            cr.move_to(cx, cy - stem * direction)
+            cr.line_to(cx, cy + stem * direction)
+            cr.move_to(cx - head, cy + (stem - head) * direction)
+            cr.line_to(cx, cy + stem * direction)
+            cr.line_to(cx + head, cy + (stem - head) * direction)
+        cr.stroke()
+
+
 class PhaseProgress(Gtk.DrawingArea):
     """Barra di avanzamento con la sfumatura della fase in corso.
 
@@ -1421,12 +1508,33 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         )
         box.append(headers)
 
-        # Riga compatta con ping, jitter e perdita di pacchetti.
-        stats = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18, halign=Gtk.Align.CENTER)
-        self._gauge_ping_label = self._build_stat(stats, _("Ping ms"))
-        self._gauge_jitter_label = self._build_stat(stats, _("Jitter ms"))
-        self._gauge_loss_label = self._build_stat(stats, _("Loss %"))
-        box.append(stats)
+        # Ping idle e sotto carico, come nell'interfaccia di speedtest.net.
+        # Jitter e perdita stanno sotto: i tre valori di latenza restano così
+        # leggibili anche nella finestra stretta.
+        latency_stats = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=14, halign=Gtk.Align.CENTER
+        )
+        latency_caption = Gtk.Label(label=_("Ping ms"))
+        latency_caption.add_css_class("caption")
+        latency_caption.add_css_class("dim-label")
+        latency_stats.append(latency_caption)
+        self._idle_ping_icon, self._gauge_ping_label = self._build_latency_stat(
+            latency_stats, "idle", _("Idle ping")
+        )
+        self._download_ping_icon, self._gauge_download_ping_label = self._build_latency_stat(
+            latency_stats, "download", _("Download ping")
+        )
+        self._upload_ping_icon, self._gauge_upload_ping_label = self._build_latency_stat(
+            latency_stats, "upload", _("Upload ping")
+        )
+        box.append(latency_stats)
+
+        secondary_stats = Gtk.Box(
+            orientation=Gtk.Orientation.HORIZONTAL, spacing=18, halign=Gtk.Align.CENTER
+        )
+        self._gauge_jitter_label = self._build_stat(secondary_stats, _("Jitter ms"))
+        self._gauge_loss_label = self._build_stat(secondary_stats, _("Loss %"))
+        box.append(secondary_stats)
 
         self._gauge = SpeedGauge(vexpand=True)
         frame = Gtk.AspectFrame(ratio=1.0, obey_child=False, vexpand=True)
@@ -1473,6 +1581,21 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         parent.append(column)
         return value
 
+    def _build_latency_stat(self, parent, phase, tooltip):
+        """Coppia icona-valore per un ping idle o durante un trasferimento."""
+        stat = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        icon = LatencyIcon(phase)
+        icon.set_tooltip_text(tooltip)
+        stat.append(icon)
+        value = Gtk.Label(label=PLACEHOLDER, valign=Gtk.Align.CENTER)
+        value.add_css_class("heading")
+        value.add_css_class("numeric")
+        value.set_selectable(True)
+        value.set_focusable(False)
+        stat.append(value)
+        parent.append(stat)
+        return icon, value
+
     def _build_classic_view(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, valign=Gtk.Align.START)
 
@@ -1481,7 +1604,9 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         box.append(state_group)
 
         measure_group = Adw.PreferencesGroup(title=_("Measurements"))
-        self._ping_label = self._add_value_row(measure_group, _("Ping"))
+        self._ping_label = self._add_value_row(measure_group, _("Idle ping"))
+        self._download_ping_label = self._add_value_row(measure_group, _("Download ping"))
+        self._upload_ping_label = self._add_value_row(measure_group, _("Upload ping"))
         self._jitter_label = self._add_value_row(measure_group, _("Jitter"))
         self._download_label = self._add_value_row(measure_group, _("Download"))
         self._upload_label = self._add_value_row(measure_group, _("Upload"))
@@ -1510,6 +1635,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._gauge.props.auto_range = bool(self._settings["auto_range"])
         self._download_icon.set_use_accent_color(accent)
         self._upload_icon.set_use_accent_color(accent)
+        self._download_ping_icon.set_use_accent_color(accent)
+        self._upload_ping_icon.set_use_accent_color(accent)
         self._progress.set_use_accent_color(accent)
         self._measures.set_visible_child_name(
             "classic" if self._settings["plain_ui"] else "gauge"
@@ -1609,6 +1736,12 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _present_history(self, *_args):
         dialog = Adw.Dialog(title=_("History"), content_width=680, content_height=580)
         header = Adw.HeaderBar()
+        sort_model = Gtk.StringList()
+        for _key, label in HISTORY_SORTS:
+            sort_model.append(_(label))
+        sort_dropdown = Gtk.DropDown(model=sort_model, valign=Gtk.Align.CENTER)
+        header.pack_start(sort_dropdown)
+
         clear_button = Gtk.Button(
             icon_name="user-trash-symbolic", tooltip_text=_("Clear the history")
         )
@@ -1621,15 +1754,18 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         dialog.set_child(view)
 
         def refresh():
-            view.set_content(self._build_history_content())
+            selected = sort_dropdown.get_selected()
+            sort_order = HISTORY_SORTS[selected][0] if selected < len(HISTORY_SORTS) else "date"
+            view.set_content(self._build_history_content(sort_order))
             clear_button.set_sensitive(bool(self._history.entries))
 
         clear_button.set_sensitive(bool(self._history.entries))
+        sort_dropdown.connect("notify::selected", lambda *_args: refresh())
         clear_button.connect("clicked", lambda *_args: self._confirm_clear_history(dialog, refresh))
         dialog.present(self)
 
-    def _build_history_content(self):
-        entries = self._history.entries
+    def _build_history_content(self, sort_order="date"):
+        entries = self._sorted_history_entries(sort_order)
         if not entries:
             return Adw.StatusPage(
                 icon_name="document-open-recent-symbolic",
@@ -1638,7 +1774,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             )
 
         group = Adw.PreferencesGroup(
-            description=_("Saved tests: {count} — most recent first, at most {limit}").format(
+            description=_("Saved tests: {count} — at most {limit}").format(
                 count=len(entries), limit=HISTORY_LIMIT
             )
         )
@@ -1657,6 +1793,100 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage()
         page.add(group)
         return page
+
+    @staticmethod
+    def _history_metric(entry, key):
+        """Restituisce solo misure finite, per gestire anche vecchi JSON corrotti."""
+        value = entry.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+            return float(value)
+        return None
+
+    @staticmethod
+    def _percentile(values, fraction):
+        """Percentile interpolato, senza dipendere da versioni specifiche di Python."""
+        position = (len(values) - 1) * fraction
+        lower = math.floor(position)
+        upper = math.ceil(position)
+        if lower == upper:
+            return values[lower]
+        return values[lower] + (values[upper] - values[lower]) * (position - lower)
+
+    @classmethod
+    def _historical_mean(cls, entries, key):
+        """Media storica, scartando gli outlier bassi con la recinzione di Tukey."""
+        values = sorted(
+            value
+            for entry in entries
+            if (value := cls._history_metric(entry, key)) is not None and value > 0
+        )
+        if not values:
+            return None
+
+        # Con pochi test non è possibile distinguere una normale oscillazione da
+        # un outlier. Da quattro misure in poi, la soglia inferiore di Tukey
+        # elimina solo valori eccezionalmente bassi, senza penalizzare variazioni
+        # realistiche della linea.
+        if len(values) >= 4:
+            first_quartile = cls._percentile(values, 0.25)
+            third_quartile = cls._percentile(values, 0.75)
+            lower_fence = first_quartile - 1.5 * (third_quartile - first_quartile)
+            retained = [value for value in values if value >= lower_fence]
+            if retained:
+                values = retained
+
+        return sum(values) / len(values)
+
+    @staticmethod
+    def _sort_history_entries(entries, value_for_entry, reverse=False):
+        """Ordina valori validi davanti a quelli mancanti, conservando le parità."""
+        def sort_key(indexed_entry):
+            index, entry = indexed_entry
+            value = value_for_entry(entry)
+            if value is None:
+                return (1, 0, index)
+            return (0, -value if reverse else value, index)
+
+        return [entry for _index, entry in sorted(enumerate(entries), key=sort_key)]
+
+    def _sorted_history_entries(self, sort_order):
+        entries = self._history.entries
+        if sort_order == "download":
+            return self._sort_history_entries(
+                entries, lambda entry: self._history_metric(entry, "download"), reverse=True
+            )
+        if sort_order == "upload":
+            return self._sort_history_entries(
+                entries, lambda entry: self._history_metric(entry, "upload"), reverse=True
+            )
+        if sort_order == "ping":
+            return self._sort_history_entries(
+                entries, lambda entry: self._history_metric(entry, "ping")
+            )
+        if sort_order == "overall":
+            download_mean = self._historical_mean(entries, "download")
+            upload_mean = self._historical_mean(entries, "upload")
+            if download_mean is not None and upload_mean is not None:
+                def overall_score(entry):
+                    download = self._history_metric(entry, "download")
+                    upload = self._history_metric(entry, "upload")
+                    if download is None or upload is None:
+                        return None
+                    return (
+                        OVERALL_DOWNLOAD_WEIGHT * download / download_mean
+                        + OVERALL_UPLOAD_WEIGHT * upload / upload_mean
+                    )
+
+                return self._sort_history_entries(entries, overall_score, reverse=True)
+
+        # I timestamp della CLI sono ISO 8601 in UTC, quindi l'ordinamento
+        # lessicografico coincide con quello cronologico. Le righe senza data
+        # restano in fondo e le parità mantengono il loro ordine nello storico.
+        return sorted(
+            entries,
+            key=lambda entry: entry.get("timestamp") if isinstance(entry.get("timestamp"), str) else "",
+            reverse=True,
+        )
 
     @staticmethod
     def _history_number(entry, key, decimals=2):
@@ -2021,17 +2251,24 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._set_phase("idle", _("Starting…"))
         for label in (
             self._ping_label,
+            self._download_ping_label,
+            self._upload_ping_label,
             self._jitter_label,
             self._download_label,
             self._upload_label,
             self._loss_label,
             self._gauge_ping_label,
+            self._gauge_download_ping_label,
+            self._gauge_upload_ping_label,
             self._gauge_jitter_label,
             self._gauge_loss_label,
             self._gauge_download_label,
             self._gauge_upload_label,
         ):
             label.set_label(PLACEHOLDER)
+        self._idle_ping_icon.set_active(False)
+        self._download_ping_icon.set_active(False)
+        self._upload_ping_icon.set_active(False)
         self._download_icon.set_active(False)
         self._upload_icon.set_active(False)
         # I dettagli tornano nascosti: si ripopolano al primo evento del test.
@@ -2074,13 +2311,39 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             # L'ago non ci salta sopra: set_target() interpola.
             self._gauge.set_target(value)
 
-    def _show_latency(self, latency, jitter):
+    def _show_latency(self, kind, latency, jitter=None):
+        """Mostra la latenza idle oppure la latenza misurata sotto carico."""
+        labels = {
+            "idle": (self._ping_label, self._gauge_ping_label, self._idle_ping_icon),
+            "download": (
+                self._download_ping_label,
+                self._gauge_download_ping_label,
+                self._download_ping_icon,
+            ),
+            "upload": (
+                self._upload_ping_label,
+                self._gauge_upload_ping_label,
+                self._upload_ping_icon,
+            ),
+        }
+        classic, gauge, icon = labels[kind]
         if isinstance(latency, (int, float)):
-            self._ping_label.set_label(f"{format_number(latency, 2)} ms")
-            self._gauge_ping_label.set_label(format_number(latency, 2))
+            rendered = format_number(latency, 2)
+            classic.set_label(f"{rendered} ms")
+            gauge.set_label(rendered)
+            icon.set_active(True)
         if isinstance(jitter, (int, float)):
             self._jitter_label.set_label(f"{format_number(jitter, 2)} ms")
             self._gauge_jitter_label.set_label(format_number(jitter, 2))
+
+    @staticmethod
+    def _loaded_latency(latency):
+        """Ricava l'IQM della latenza sotto carico da un evento della CLI."""
+        if isinstance(latency, (int, float)):
+            return latency
+        if isinstance(latency, dict):
+            return latency.get("iqm")
+        return None
 
     def _show_loss(self, loss):
         if isinstance(loss, (int, float)):
@@ -2140,7 +2403,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             # in pochi istanti. La barra in basso rappresenta però il
             # trasferimento dati: mostrarlo qui la faceva sembrare completata
             # prima ancora che iniziasse il download.
-            self._show_latency(data.get("latency"), data.get("jitter"))
+            self._show_latency("idle", data.get("latency"), data.get("jitter"))
 
         elif event_type in ("download", "upload"):
             data = event.get(event_type, {})
@@ -2152,6 +2415,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             bandwidth = data.get("bandwidth")
             if isinstance(bandwidth, (int, float)):
                 self._show_speed(event_type, mbps(bandwidth))
+            self._show_latency(event_type, self._loaded_latency(data.get("latency")))
 
         elif event_type == "result":
             self._apply_result(event)
@@ -2164,7 +2428,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _apply_result(self, event):
         """Valori definitivi presi dall'evento `result` (più precisi dei parziali)."""
         ping = event.get("ping", {})
-        self._show_latency(ping.get("latency"), ping.get("jitter"))
+        self._show_latency("idle", ping.get("latency"), ping.get("jitter"))
 
         for key in ("download", "upload"):
             bandwidth = event.get(key, {}).get("bandwidth")
