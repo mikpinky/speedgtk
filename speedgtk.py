@@ -1318,7 +1318,10 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         box.append(self._start_button)
 
         # --- Dettagli del risultato: nascosti finché non c'è un test ---
-        self._details_group = Adw.PreferencesGroup(visible=False)
+        # Il Revealer fa crescere l'area gradualmente quando arriva il primo
+        # evento del test. Di conseguenza anche il tachimetro riceve meno
+        # spazio a ogni frame, anziché ridursi in un unico scatto.
+        self._details_group = Adw.PreferencesGroup()
         self._server_detail_row = Adw.ActionRow(title=_("Server used"), subtitle=PLACEHOLDER)
         self._server_detail_row.set_subtitle_selectable(True)
         self._details_group.add(self._server_detail_row)
@@ -1332,7 +1335,11 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._result_link.set_valign(Gtk.Align.CENTER)
         self._result_row.add_suffix(self._result_link)
         self._details_group.add(self._result_row)
-        box.append(self._details_group)
+        self._details_revealer = Gtk.Revealer()
+        self._details_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
+        self._details_revealer.set_transition_duration(280)
+        self._details_revealer.set_child(self._details_group)
+        box.append(self._details_revealer)
 
         # --- Selezione del server ---
         server_group = Adw.PreferencesGroup()
@@ -2016,7 +2023,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._download_icon.set_active(False)
         self._upload_icon.set_active(False)
         # I dettagli tornano nascosti: si ripopolano al primo evento del test.
-        self._details_group.set_visible(False)
+        self._details_revealer.set_reveal_child(False)
         self._result_row.set_visible(False)
         self._server_detail_row.set_subtitle(PLACEHOLDER)
         self._isp_row.set_subtitle(PLACEHOLDER)
@@ -2179,10 +2186,10 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
                     server.get("id", "?"),
                 )
             )
-            self._details_group.set_visible(True)
+            self._details_revealer.set_reveal_child(True)
         if isp:
             self._isp_row.set_subtitle(str(isp))
-            self._details_group.set_visible(True)
+            self._details_revealer.set_reveal_child(True)
 
     def _set_progress(self, progress):
         if isinstance(progress, (int, float)):
