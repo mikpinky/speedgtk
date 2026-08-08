@@ -1,0 +1,3 @@
+#!/bin/sh
+# Questo file viene configurato dal Makefile al momento dell'installazione.
+exec python3 "@DATADIR@/speedgtk.py" "$@"

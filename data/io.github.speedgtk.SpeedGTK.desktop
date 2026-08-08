@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=SpeedGTK
+Comment=Test your Internet connection with Ookla Speedtest
+Exec=speedgtk
+Icon=io.github.speedgtk.SpeedGTK
+Terminal=false
+Type=Application
+Categories=Network;
+Keywords=speedtest;internet;network;download;upload;ping;
+StartupNotify=true
+StartupWMClass=io.github.speedgtk.SpeedGTK
