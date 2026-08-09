@@ -36,7 +36,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noq
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
-APP_VERSION = "1.7"
+APP_VERSION = "1.8"
 
 BIN = "speedtest"
 # Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
@@ -388,6 +388,7 @@ class Settings:
         "plain_ui": False,
         "accent_colors": False,
         "auto_range": True,
+        "measurement_decimals": 2,
         "color_scheme": "system",
         "keep_history": True,
         "language": "system",
@@ -769,6 +770,7 @@ class SpeedGauge(Gtk.DrawingArea):
         self._scale_progress = 1.0
         self._use_accent = False
         self._auto_range = True
+        self._measurement_decimals = 2
         self._vignette_dither_surface = None
         self._vignette_dither_key = None
 
@@ -864,6 +866,13 @@ class SpeedGauge(Gtk.DrawingArea):
             # verrà inseguito appena l'animazione lenta è finita.
             return
         self._animate_to(speed, TRACK_DURATION_MS, Adw.Easing.EASE_OUT_CUBIC)
+
+    def set_measurement_decimals(self, decimals):
+        """Aggiorna la precisione del valore grande senza toccare l'animazione."""
+        decimals = min(max(int(decimals), 0), 2)
+        if decimals != self._measurement_decimals:
+            self._measurement_decimals = decimals
+            self.queue_draw()
 
     def set_phase(self, phase):
         """Fase del test: decide i colori e il ritorno a zero fra una e l'altra."""
@@ -1272,7 +1281,7 @@ class SpeedGauge(Gtk.DrawingArea):
         draw_text(
             self,
             cr,
-            format_number(self._value, 2),
+            format_number(self._value, self._measurement_decimals),
             cx,
             cy + size * self.VALUE_OFFSET,
             size * self.VALUE_SIZE,
@@ -1701,6 +1710,9 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._last_error = None  # messaggio dell'ultimo evento di errore
         self._phase = "idle"  # fase corrente, per il tachimetro
         self._live = {"download": None, "upload": None}  # ultimi valori visti
+        self._latencies = {"idle": None, "download": None, "upload": None}
+        self._jitter = None
+        self._loss = None
         self._auto_server = True  # il test in corso usa la scelta automatica?
         self._updating_servers = False  # ricostruzione dell'elenco in corso
         self._has_run = False  # almeno un test concluso in questa finestra
@@ -2091,6 +2103,32 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._measures.set_visible_child_name(
             "classic" if self._settings["plain_ui"] else "gauge"
         )
+        self._apply_measurement_precision()
+
+    def _measurement_decimals(self):
+        """Numero di decimali scelto dall'utente, sempre nell'intervallo 0–2."""
+        value = self._settings["measurement_decimals"]
+        return value if type(value) is int and value in (0, 1, 2) else 2
+
+    def _jitter_decimals(self):
+        """Jitter resta a due cifre, tranne nella visualizzazione senza decimali."""
+        return 1 if self._measurement_decimals() == 0 else 2
+
+    def _apply_measurement_precision(self):
+        """Riformatta i valori già in vista quando cambia la preferenza."""
+        self._gauge.set_measurement_decimals(self._measurement_decimals())
+        for kind, value in self._live.items():
+            if isinstance(value, (int, float)):
+                self._render_speed(kind, value)
+                if kind != self._phase:
+                    self._commit_header(kind)
+        for kind, latency in self._latencies.items():
+            if isinstance(latency, (int, float)):
+                self._render_latency(kind, latency)
+        if isinstance(self._jitter, (int, float)):
+            self._render_jitter(self._jitter)
+        if isinstance(self._loss, (int, float)):
+            self._render_loss(self._loss)
 
     def _on_setting_toggled(self, row, _pspec, key):
         self._settings.set(key, row.get_active())
@@ -2101,7 +2139,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage(title=_("General"), icon_name="preferences-system-symbolic")
 
         appearance = Adw.PreferencesGroup(title=_("Appearance"))
-        appearance.add(self._theme_row())
         appearance.add(
             self._switch_row(
                 _("Classic interface"), _("Text labels only, no gauge"), "plain_ui"
@@ -2114,10 +2151,12 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
                 "accent_colors",
             )
         )
+        appearance.add(self._theme_row())
         appearance.add(self._language_row())
         page.add(appearance)
 
         measures = Adw.PreferencesGroup(title=_("Measurements"))
+        measures.add(self._decimal_places_row())
         measures.add(
             self._switch_row(
                 _("Automatic scale"),
@@ -2151,6 +2190,28 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _switch_row(self, title, subtitle, key):
         row = Adw.SwitchRow(title=title, subtitle=subtitle, active=bool(self._settings[key]))
         row.connect("notify::active", self._on_setting_toggled, key)
+        return row
+
+    def _decimal_places_row(self):
+        """SpinRow compatta: mostra frecce su/giù invece di un menu a tendina."""
+        row = Adw.SpinRow.new_with_range(0, 2, 1)
+        row.set_title(_("Decimal places"))
+        row.set_subtitle(_("Download, upload and ping"))
+        row.set_digits(0)
+        row.set_numeric(True)
+        row.set_snap_to_ticks(True)
+        row.set_wrap(False)
+        row.set_value(self._measurement_decimals())
+
+        def changed(spin_row, _pspec):
+            decimals = int(round(spin_row.get_value()))
+            if decimals != spin_row.get_value():
+                spin_row.set_value(decimals)
+                return
+            self._settings.set("measurement_decimals", decimals)
+            self._apply_measurement_precision()
+
+        row.connect("notify::value", changed)
         return row
 
     def _language_row(self):
@@ -2387,8 +2448,9 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             reverse=True,
         )
 
-    @staticmethod
-    def _history_number(entry, key, decimals=2):
+    def _history_number(self, entry, key, decimals=None):
+        if decimals is None:
+            decimals = self._measurement_decimals()
         value = entry.get(key)
         return format_number(value, decimals) if isinstance(value, (int, float)) else PLACEHOLDER
 
@@ -2409,7 +2471,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             lines.append(_("ISP: {isp}").format(isp=entry["isp"]))
         lines.append(
             _("Jitter {jitter} ms · loss {loss} %").format(
-                jitter=self._history_number(entry, "jitter"),
+                jitter=self._history_number(entry, "jitter", self._jitter_decimals()),
                 loss=self._history_number(entry, "loss", 1),
             )
         )
@@ -2764,6 +2826,9 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._cancel_progress_hide()
         self._last_error = None
         self._live = {"download": None, "upload": None}
+        self._latencies = {"idle": None, "download": None, "upload": None}
+        self._jitter = None
+        self._loss = None
         self._progress.set_fraction(0.0)
         self._set_phase("idle", _("Starting…"))
         for label in (
@@ -2815,21 +2880,26 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         if value is None:
             return
         label = self._gauge_download_label if kind == "download" else self._gauge_upload_label
-        label.set_label(format_number(value, 2))
+        label.set_label(format_number(value, self._measurement_decimals()))
+
+    def _render_speed(self, kind, value):
+        """Aggiorna le etichette della vista classica senza muovere l'ago."""
+        classic = self._download_label if kind == "download" else self._upload_label
+        classic.set_label(
+            "{} {}".format(format_number(value, self._measurement_decimals()), _("Mbps"))
+        )
 
     def _show_speed(self, kind, value):
         """Nuova velocità per download o upload, in Mbps."""
         self._live[kind] = value
-        classic = self._download_label if kind == "download" else self._upload_label
-        classic.set_label("{} {}".format(format_number(value, 2), _("Mbps")))
+        self._render_speed(kind, value)
         icon = self._download_icon if kind == "download" else self._upload_icon
         icon.set_active(True)
         if self._phase == kind:
             # L'ago non ci salta sopra: set_target() interpola.
             self._gauge.set_target(value)
 
-    def _show_latency(self, kind, latency, jitter=None):
-        """Mostra la latenza idle oppure la latenza misurata sotto carico."""
+    def _latency_widgets(self, kind):
         labels = {
             "idle": (self._ping_label, self._gauge_ping_label, self._idle_ping_icon),
             "download": (
@@ -2843,15 +2913,29 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
                 self._upload_ping_icon,
             ),
         }
-        classic, gauge, icon = labels[kind]
+        return labels[kind]
+
+    def _render_latency(self, kind, latency):
+        classic, gauge, _icon = self._latency_widgets(kind)
+        rendered = format_number(latency, self._measurement_decimals())
+        classic.set_label(f"{rendered} ms")
+        gauge.set_label(rendered)
+
+    def _render_jitter(self, jitter):
+        rendered = format_number(jitter, self._jitter_decimals())
+        self._jitter_label.set_label(f"{rendered} ms")
+        self._gauge_jitter_label.set_label(rendered)
+
+    def _show_latency(self, kind, latency, jitter=None):
+        """Mostra la latenza idle oppure la latenza misurata sotto carico."""
         if isinstance(latency, (int, float)):
-            rendered = format_number(latency, 2)
-            classic.set_label(f"{rendered} ms")
-            gauge.set_label(rendered)
+            self._latencies[kind] = latency
+            self._render_latency(kind, latency)
+            _classic, _gauge, icon = self._latency_widgets(kind)
             icon.set_active(True)
         if isinstance(jitter, (int, float)):
-            self._jitter_label.set_label(f"{format_number(jitter, 2)} ms")
-            self._gauge_jitter_label.set_label(format_number(jitter, 2))
+            self._jitter = jitter
+            self._render_jitter(jitter)
 
     @staticmethod
     def _loaded_latency(latency):
@@ -2862,13 +2946,18 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             return latency.get("iqm")
         return None
 
+    def _render_loss(self, loss):
+        rendered = format_number(loss, 1)
+        self._loss_label.set_label(f"{rendered} %")
+        self._gauge_loss_label.set_label(rendered)
+
     def _show_loss(self, loss):
-        if isinstance(loss, (int, float)):
-            self._loss_label.set_label(f"{format_number(loss, 1)} %")
-            self._gauge_loss_label.set_label(format_number(loss, 1))
-        else:
-            self._loss_label.set_label(_("not available"))
-            self._gauge_loss_label.set_label(PLACEHOLDER)
+        self._loss = loss if isinstance(loss, (int, float)) else None
+        if self._loss is not None:
+            self._render_loss(self._loss)
+            return
+        self._loss_label.set_label(_("not available"))
+        self._gauge_loss_label.set_label(PLACEHOLDER)
 
     # ==================================================================
     # PARSER DEGLI EVENTI JSONL
