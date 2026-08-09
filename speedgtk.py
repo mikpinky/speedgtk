@@ -2377,9 +2377,11 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             row.set_tooltip_text(self._history_details(entry))
             url = entry.get("url")
             if url:
-                link = Gtk.LinkButton.new_with_label(url, _("Open"))
+                link = Gtk.LinkButton(uri=url)
+                link.set_icon_name("external-link-symbolic")
+                link.add_css_class("flat")
                 link.set_valign(Gtk.Align.CENTER)
-                link.set_tooltip_text(url)
+                link.set_tooltip_text(_("View this result online"))
                 row.add_suffix(link)
             group.add(row)
 
