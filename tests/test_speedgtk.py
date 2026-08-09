@@ -10,7 +10,7 @@ from speedgtk.domain.history import (
     history_metric,
     sorted_history_entries,
 )
-from speedgtk.speedtest.parser import loaded_latency, parse_jsonl_line
+from speedgtk.speedtest.providers.ookla.parser import loaded_latency, parse_jsonl_line
 from speedgtk.ui.server_picker import resolve_server_id
 
 

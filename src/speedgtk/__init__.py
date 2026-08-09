@@ -2,7 +2,7 @@
 
 from .formatting import clean_version, format_number, mbps
 from .i18n import TRANSLATIONS, Translations, parse_po
-from .speedtest.errors import extract_cli_error, humanize_cli_error
+from .speedtest import extract_cli_error, humanize_cli_error
 from .storage import History, Settings
 from .ui.main_window import SpeedGTKWindow
 

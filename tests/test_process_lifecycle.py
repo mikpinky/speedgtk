@@ -5,7 +5,9 @@ import unittest
 
 from gi.repository import Gio
 
-from speedgtk.speedtest.process import SpeedtestRun, run_and_capture
+from speedgtk.speedtest import SpeedtestRun
+from speedgtk.speedtest.process import run_and_capture
+from speedgtk.speedtest.providers.ookla import OoklaRun
 from speedgtk.ui.main_window import SpeedGTKWindow
 
 
@@ -26,8 +28,11 @@ class FakeCancellable:
 
 
 class ProcessLifecycleTests(unittest.TestCase):
+    def test_legacy_run_name_points_to_the_ookla_provider(self):
+        self.assertIs(SpeedtestRun, OoklaRun)
+
     def test_active_speedtest_is_force_killed(self):
-        run = SpeedtestRun(
+        run = OoklaRun(
             [sys.executable, "-c", "import time; time.sleep(2)"],
             lambda *_args: None,
             lambda *_args: None,

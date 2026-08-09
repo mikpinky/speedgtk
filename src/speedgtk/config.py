@@ -9,9 +9,6 @@ APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
 APP_VERSION = "1.9"
 
-BIN = "speedtest"
-OOKLA_SIGNATURE = "Speedtest by Ookla"
-ACCEPT_FLAGS = ["--accept-license", "--accept-gdpr"]
 PROGRESS_INTERVAL_MS = 100
 PROGRESS_HIDE_DELAY_MS = 600
 LAYOUT_TRANSITION_DURATION_MS = 600

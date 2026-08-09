@@ -1,4 +1,4 @@
-"""Pure parsing helpers for the CLI's JSONL event stream."""
+"""Pure parsing helpers for the Ookla CLI JSONL event stream."""
 
 import json
 

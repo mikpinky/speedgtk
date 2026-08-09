@@ -1,8 +1,8 @@
-"""Extraction and presentation of errors reported by the Speedtest CLI."""
+"""Extraction and presentation of errors reported by the Ookla CLI."""
 
 import json
 
-from ..i18n import N_, _
+from ....i18n import N_, _
 
 
 # The CLI can print these privacy notices to stderr even after a successful run.

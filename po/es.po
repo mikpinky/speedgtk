@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SpeedGTK 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-09 17:50+0200\n"
+"POT-Creation-Date: 2026-08-09 18:46+0200\n"
 "PO-Revision-Date: 2026-08-08 12:00+0000\n"
 "Last-Translator: SpeedGTK contributors\n"
 "Language-Team: Spanish\n"
@@ -15,7 +15,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/speedgtk/application.py:52
+#: src/speedgtk/application.py:59
 msgid ""
 "Usage: speedgtk.py [options]\n"
 "\n"
@@ -72,11 +72,11 @@ msgstr "Español"
 msgid "Russian"
 msgstr "Ruso"
 
-#: src/speedgtk/speedtest/errors.py:26
+#: src/speedgtk/speedtest/providers/ookla/errors.py:26
 msgid "Too many tests in a short time"
 msgstr "Demasiadas pruebas en poco tiempo"
 
-#: src/speedgtk/speedtest/errors.py:28
+#: src/speedgtk/speedtest/providers/ookla/errors.py:28
 msgid ""
 "Ookla is temporarily limiting this connection because too many tests were "
 "run in a short time. Wait a few minutes before repeating it."
@@ -84,11 +84,11 @@ msgstr ""
 "Ookla está limitando temporalmente esta conexión porque se han hecho "
 "demasiadas pruebas en poco tiempo. Espera unos minutos antes de repetirla."
 
-#: src/speedgtk/speedtest/errors.py:34
+#: src/speedgtk/speedtest/providers/ookla/errors.py:34
 msgid "No test server available"
 msgstr "No hay servidores de prueba disponibles"
 
-#: src/speedgtk/speedtest/errors.py:36
+#: src/speedgtk/speedtest/providers/ookla/errors.py:36
 msgid ""
 "Ookla returned no usable server. Refresh the list, or pick a different "
 "server, and try again."
@@ -96,11 +96,11 @@ msgstr ""
 "Ookla no ha devuelto ningún servidor utilizable. Actualiza la lista o elige "
 "otro servidor y vuelve a intentarlo."
 
-#: src/speedgtk/speedtest/errors.py:42
+#: src/speedgtk/speedtest/providers/ookla/errors.py:42
 msgid "Cannot reach Ookla's servers"
 msgstr "No se puede acceder a los servidores de Ookla"
 
-#: src/speedgtk/speedtest/errors.py:44
+#: src/speedgtk/speedtest/providers/ookla/errors.py:44
 msgid ""
 "The configuration service could not be reached. Check that the connection is "
 "working and that no proxy or firewall is blocking it."
@@ -108,21 +108,23 @@ msgstr ""
 "No se pudo contactar con el servicio de configuración. Comprueba que la "
 "conexión funciona y que ningún proxy o cortafuegos la bloquea."
 
-#: src/speedgtk/speedtest/errors.py:50 src/speedgtk/speedtest/errors.py:55
+#: src/speedgtk/speedtest/providers/ookla/errors.py:50
+#: src/speedgtk/speedtest/providers/ookla/errors.py:55
 msgid "Name resolution failed"
 msgstr "Fallo en la resolución de nombres"
 
-#: src/speedgtk/speedtest/errors.py:51 src/speedgtk/speedtest/errors.py:56
+#: src/speedgtk/speedtest/providers/ookla/errors.py:51
+#: src/speedgtk/speedtest/providers/ookla/errors.py:56
 msgid ""
 "The server name could not be resolved: this usually points at a DNS problem."
 msgstr ""
 "No se pudo resolver el nombre del servidor: suele ser un problema de DNS."
 
-#: src/speedgtk/speedtest/errors.py:60
+#: src/speedgtk/speedtest/providers/ookla/errors.py:60
 msgid "The connection timed out"
 msgstr "Se agotó el tiempo de conexión"
 
-#: src/speedgtk/speedtest/errors.py:61
+#: src/speedgtk/speedtest/providers/ookla/errors.py:61
 msgid ""
 "The test server did not answer in time. It may be overloaded: try another "
 "one."
@@ -130,38 +132,40 @@ msgstr ""
 "El servidor de prueba no respondió a tiempo. Puede estar sobrecargado: "
 "prueba con otro."
 
-#: src/speedgtk/speedtest/errors.py:65 src/speedgtk/speedtest/errors.py:70
-#: src/speedgtk/speedtest/errors.py:75
+#: src/speedgtk/speedtest/providers/ookla/errors.py:65
+#: src/speedgtk/speedtest/providers/ookla/errors.py:70
+#: src/speedgtk/speedtest/providers/ookla/errors.py:75
 msgid "Cannot connect to the test server"
 msgstr "No se puede conectar con el servidor de prueba"
 
-#: src/speedgtk/speedtest/errors.py:66 src/speedgtk/speedtest/errors.py:71
-#: src/speedgtk/speedtest/errors.py:76
+#: src/speedgtk/speedtest/providers/ookla/errors.py:66
+#: src/speedgtk/speedtest/providers/ookla/errors.py:71
+#: src/speedgtk/speedtest/providers/ookla/errors.py:76
 msgid ""
 "The connection to the chosen server could not be opened. Try another server."
 msgstr ""
 "No se pudo abrir la conexión con el servidor elegido. Prueba con otro "
 "servidor."
 
-#: src/speedgtk/speedtest/errors.py:80
+#: src/speedgtk/speedtest/providers/ookla/errors.py:80
 msgid "Request refused by the server"
 msgstr "Solicitud rechazada por el servidor"
 
-#: src/speedgtk/speedtest/errors.py:81
+#: src/speedgtk/speedtest/providers/ookla/errors.py:81
 msgid "The test server refused the request. Try a different server."
 msgstr "El servidor de prueba rechazó la solicitud. Prueba con otro servidor."
 
-#: src/speedgtk/speedtest/errors.py:85
+#: src/speedgtk/speedtest/providers/ookla/errors.py:85
 msgid "Test interrupted"
 msgstr "Prueba interrumpida"
 
-#: src/speedgtk/speedtest/errors.py:86
+#: src/speedgtk/speedtest/providers/ookla/errors.py:86
 msgid "The test ended early. Check that the connection stayed up."
 msgstr ""
 "La prueba terminó antes de tiempo. Comprueba que la conexión se mantuvo "
 "activa."
 
-#: src/speedgtk/speedtest/errors.py:99
+#: src/speedgtk/speedtest/providers/ookla/errors.py:99
 msgid "speedtest reported an unspecified error"
 msgstr "speedtest informó de un error no especificado"
 
@@ -215,7 +219,7 @@ msgstr "Las pruebas completadas aparecen aquí, si el historial está activo."
 msgid "Saved tests: {count} — at most {limit}"
 msgstr "Pruebas guardadas: {count} — como máximo {limit}"
 
-#: src/speedgtk/ui/dialogs/history.py:99 src/speedgtk/ui/main_window.py:161
+#: src/speedgtk/ui/dialogs/history.py:99 src/speedgtk/ui/main_window.py:166
 msgid "View this result online"
 msgstr "Ver este resultado en línea"
 
@@ -251,7 +255,7 @@ msgstr ""
 "Se eliminarán los resultados guardados en este equipo. Las pruebas siguen "
 "disponibles en sus enlaces de speedtest.net."
 
-#: src/speedgtk/ui/dialogs/history.py:145 src/speedgtk/ui/main_window.py:349
+#: src/speedgtk/ui/dialogs/history.py:145 src/speedgtk/ui/main_window.py:365
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -453,114 +457,114 @@ msgstr "Salida obtenida: {output}"
 msgid "Try again"
 msgstr "Reintentar"
 
-#: src/speedgtk/ui/main_window.py:70 src/speedgtk/ui/main_window.py:305
+#: src/speedgtk/ui/main_window.py:75 src/speedgtk/ui/main_window.py:321
 msgid "Refresh the server list"
 msgstr "Actualizar la lista de servidores"
 
-#: src/speedgtk/ui/main_window.py:77
+#: src/speedgtk/ui/main_window.py:82
 msgid "History…"
 msgstr "Historial…"
 
-#: src/speedgtk/ui/main_window.py:78
+#: src/speedgtk/ui/main_window.py:83
 msgid "Preferences…"
 msgstr "Preferencias…"
 
-#: src/speedgtk/ui/main_window.py:79
+#: src/speedgtk/ui/main_window.py:84
 msgid "About"
 msgstr "Acerca de"
 
-#: src/speedgtk/ui/main_window.py:81
+#: src/speedgtk/ui/main_window.py:86
 msgid "Menu"
 msgstr "Menú"
 
-#: src/speedgtk/ui/main_window.py:117
+#: src/speedgtk/ui/main_window.py:122
 msgid "Checking speedtest…"
 msgstr "Comprobando speedtest…"
 
-#: src/speedgtk/ui/main_window.py:118
+#: src/speedgtk/ui/main_window.py:123
 msgid "Looking for the official Ookla CLI."
 msgstr "Buscando la CLI oficial de Ookla."
 
-#: src/speedgtk/ui/main_window.py:144
+#: src/speedgtk/ui/main_window.py:149
 msgid "Clear test"
 msgstr "Restablecer prueba"
 
-#: src/speedgtk/ui/main_window.py:154 src/speedgtk/ui/main_window.py:353
+#: src/speedgtk/ui/main_window.py:159 src/speedgtk/ui/main_window.py:369
 msgid "Start test"
 msgstr "Iniciar prueba"
 
-#: src/speedgtk/ui/main_window.py:304
+#: src/speedgtk/ui/main_window.py:320
 msgid "Could not load the servers"
 msgstr "No se pudieron cargar los servidores"
 
-#: src/speedgtk/ui/main_window.py:311
+#: src/speedgtk/ui/main_window.py:327
 #, python-brace-format
 msgid "Refresh the server list — nearby: {count}"
 msgstr "Actualizar la lista de servidores — cercanos: {count}"
 
-#: src/speedgtk/ui/main_window.py:318
+#: src/speedgtk/ui/main_window.py:334
 msgid "Cancelling…"
 msgstr "Cancelando…"
 
-#: src/speedgtk/ui/main_window.py:342
+#: src/speedgtk/ui/main_window.py:358
 msgid "Cannot start speedtest"
 msgstr "No se puede iniciar speedtest"
 
-#: src/speedgtk/ui/main_window.py:353
+#: src/speedgtk/ui/main_window.py:369
 msgid "Repeat test"
 msgstr "Repetir prueba"
 
-#: src/speedgtk/ui/main_window.py:364
+#: src/speedgtk/ui/main_window.py:380
 msgid "Starting…"
 msgstr "Iniciando…"
 
-#: src/speedgtk/ui/main_window.py:417 src/speedgtk/ui/results_view.py:256
+#: src/speedgtk/ui/main_window.py:433 src/speedgtk/ui/results_view.py:256
 #: src/speedgtk/ui/results_view.py:323
 msgid "Ready"
 msgstr "Listo"
 
-#: src/speedgtk/ui/main_window.py:432
+#: src/speedgtk/ui/main_window.py:450
 msgid "Test started…"
 msgstr "Prueba iniciada…"
 
-#: src/speedgtk/ui/main_window.py:437
+#: src/speedgtk/ui/main_window.py:455
 msgid "Measuring ping…"
 msgstr "Midiendo el ping…"
 
-#: src/speedgtk/ui/main_window.py:447
+#: src/speedgtk/ui/main_window.py:465
 msgid "Download…"
 msgstr "Descarga…"
 
-#: src/speedgtk/ui/main_window.py:447
+#: src/speedgtk/ui/main_window.py:465
 msgid "Upload…"
 msgstr "Subida…"
 
-#: src/speedgtk/ui/main_window.py:472
+#: src/speedgtk/ui/main_window.py:490
 msgid "Completed"
 msgstr "Completada"
 
-#: src/speedgtk/ui/main_window.py:513 src/speedgtk/ui/main_window.py:515
+#: src/speedgtk/ui/main_window.py:533 src/speedgtk/ui/main_window.py:535
 msgid "Test cancelled"
 msgstr "Prueba cancelada"
 
-#: src/speedgtk/ui/main_window.py:520 src/speedgtk/ui/main_window.py:530
+#: src/speedgtk/ui/main_window.py:540 src/speedgtk/ui/main_window.py:550
 msgid "Error"
 msgstr "Error"
 
-#: src/speedgtk/ui/main_window.py:528
+#: src/speedgtk/ui/main_window.py:548
 #, python-brace-format
 msgid "speedtest exited with code {code}"
 msgstr "speedtest terminó con el código {code}"
 
-#: src/speedgtk/ui/main_window.py:542
+#: src/speedgtk/ui/main_window.py:562
 msgid "Details"
 msgstr "Detalles"
 
-#: src/speedgtk/ui/main_window.py:548
+#: src/speedgtk/ui/main_window.py:568
 msgid "speedtest error"
 msgstr "Error de speedtest"
 
-#: src/speedgtk/ui/main_window.py:549
+#: src/speedgtk/ui/main_window.py:569
 msgid "Close"
 msgstr "Cerrar"
 

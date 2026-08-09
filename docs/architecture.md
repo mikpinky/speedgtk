@@ -4,7 +4,8 @@ SpeedGTK is a Python package under `src/speedgtk`. The GTK layer depends on the
 application services and domain rules; lower-level modules never import the UI.
 
 ```text
-__main__ -> application -> ui -> speedtest
+__main__ -> application -> ui -> speedtest/process
+                         |  |-> speedtest/providers/ookla
                          |  `-> domain
                          `----> storage
 ```
@@ -17,7 +18,12 @@ __main__ -> application -> ui -> speedtest
   translations, and presentation formatting.
 - `domain/` contains pure history validation, ranking, and result mapping.
 - `storage/` owns the JSON settings and history files.
-- `speedtest/` owns Gio subprocesses, JSONL parsing, and CLI error handling.
+- `speedtest/process.py` owns provider-neutral Gio subprocess management.
+- `speedtest/providers/ookla/` owns the active Ookla CLI adapter, including
+  constants, JSONL parsing, error handling, and the streaming run lifecycle.
+- `speedtest/providers/librespeed/` reserves the boundary for a future
+  LibreSpeed adapter. It intentionally contains no implementation yet, so a
+  later change can choose between direct HTTP and `librespeed-cli` integration.
 - `ui/main_window.py` coordinates the current test and top-level navigation.
 - `ui/results_view.py` owns measurement state and the gauge/classic views.
 - `ui/server_picker.py` owns server-list state and manual-ID validation.
@@ -31,7 +37,7 @@ __main__ -> application -> ui -> speedtest
 1. `SpeedGTKApplication` creates a `SpeedGTKWindow` with shared settings and
    history stores.
 2. The window validates the official Ookla CLI and loads nearby servers.
-3. `SpeedtestRun` reads JSONL events asynchronously on the GLib main loop.
+3. `OoklaRun` reads JSONL events asynchronously on the GLib main loop.
 4. The window coordinates each event while `MeasurementsView` renders values
    and `ResultDetails` renders server and ISP metadata.
 5. A successful final event is mapped to the stable history schema by the
@@ -44,6 +50,8 @@ __main__ -> application -> ui -> speedtest
 - Never block the GLib main loop or stop draining child-process pipes.
 - Every CLI subprocess must be owned and force-terminated during window or
   application shutdown.
+- Provider adapters own parsing and emit the application event shape consumed
+  by the UI; provider-specific parsing details stay inside their package.
 - Pass Ookla acceptance flags only after explicit user consent.
 - Keep custom drawing inside `ui/widgets`; process and domain code must not
   depend on GTK widgets.

@@ -12,10 +12,7 @@ gi.require_version("PangoCairo", "1.0")
 from gi.repository import Adw, Gio, GLib, Gtk
 
 from ..config import (
-    ACCEPT_FLAGS,
     APP_NAME,
-    BIN,
-    OOKLA_SIGNATURE,
     PROGRESS_HIDE_DELAY_MS,
     PROGRESS_INTERVAL_MS,
     RESULT_ACTION_TRANSITION_DURATION_MS,
@@ -23,13 +20,16 @@ from ..config import (
 from ..domain.history import history_entry_from_result
 from ..formatting import clean_version, mbps
 from ..i18n import _
-from ..speedtest import (
-    SpeedtestRun,
+from ..speedtest import run_and_capture
+from ..speedtest.providers.ookla import (
+    ACCEPT_FLAGS,
+    BIN,
+    OOKLA_SIGNATURE,
+    OoklaRun,
     extract_cli_error,
     humanize_cli_error,
-    run_and_capture,
 )
-from ..speedtest.parser import loaded_latency
+from ..speedtest.providers.ookla.parser import loaded_latency
 from .dialogs import (
     configure_unavailable_page,
     present_about,
@@ -351,7 +351,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
         self._reset_results()
         try:
-            self._run = SpeedtestRun(argv, self._on_event, self._on_run_done)
+            self._run = OoklaRun(argv, self._on_event, self._on_run_done)
         except GLib.Error as err:
             self._toast(_("Cannot start speedtest"), err.message)
             return
