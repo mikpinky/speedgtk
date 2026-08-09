@@ -1,0 +1,1 @@
+"""SpeedGTK test suite."""

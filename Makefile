@@ -8,13 +8,17 @@ APPLICATIONSDIR := $(PREFIX)/share/applications
 ICONDIR := $(PREFIX)/share/icons/hicolor/scalable/apps
 USER_CONFIG_DIR ?= $(or $(XDG_CONFIG_HOME),$(HOME)/.config)
 
-.PHONY: all install install-user uninstall uninstall-user check
+.PHONY: all install install-user uninstall uninstall-user check test
 
 all:
 	@echo "Nothing to build: SpeedGTK is a Python application."
 
 check:
 	python3 -m py_compile speedgtk.py
+	python3 -m unittest discover -s tests
+
+test:
+	python3 -m unittest discover -s tests -v
 
 install: check
 	install -d "$(DESTDIR)$(DATADIR)/po" "$(DESTDIR)$(BINDIR)" \
