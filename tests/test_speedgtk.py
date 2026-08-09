@@ -5,6 +5,7 @@ import types
 import unittest
 
 import speedgtk
+from speedgtk.domain.history import history_metric, sorted_history_entries
 
 
 class TranslationTests(unittest.TestCase):
@@ -126,11 +127,9 @@ class CliErrorTests(unittest.TestCase):
 
 class HistoryRankingTests(unittest.TestCase):
     def test_invalid_history_metrics_are_rejected(self):
-        metric = speedgtk.SpeedGTKWindow._history_metric
-
-        self.assertEqual(metric({"download": 10}, "download"), 10.0)
-        self.assertIsNone(metric({"download": True}, "download"))
-        self.assertIsNone(metric({"download": float("inf")}, "download"))
+        self.assertEqual(history_metric({"download": 10}, "download"), 10.0)
+        self.assertIsNone(history_metric({"download": True}, "download"))
+        self.assertIsNone(history_metric({"download": float("inf")}, "download"))
 
     def test_overall_sort_normalizes_download_and_upload(self):
         entries = [
@@ -138,16 +137,9 @@ class HistoryRankingTests(unittest.TestCase):
             {"timestamp": "b", "download": 80, "upload": 30},
             {"timestamp": "c", "download": None, "upload": 50},
         ]
-        window = types.SimpleNamespace(
-            _history=types.SimpleNamespace(entries=entries),
-            _history_metric=speedgtk.SpeedGTKWindow._history_metric,
-            _historical_mean=speedgtk.SpeedGTKWindow._historical_mean,
-            _sort_history_entries=speedgtk.SpeedGTKWindow._sort_history_entries,
-        )
+        ranked_entries = sorted_history_entries(entries, "overall")
 
-        sorted_entries = speedgtk.SpeedGTKWindow._sorted_history_entries(window, "overall")
-
-        self.assertEqual([entry["timestamp"] for entry in sorted_entries], ["b", "a", "c"])
+        self.assertEqual([entry["timestamp"] for entry in ranked_entries], ["b", "a", "c"])
 
 
 class EventHandlingTests(unittest.TestCase):

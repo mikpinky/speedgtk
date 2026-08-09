@@ -17,10 +17,7 @@ Requisiti: GTK 4, libadwaita >= 1.5, PyGObject, e la CLI ufficiale `speedtest`.
 """
 
 import json
-import locale
 import math
-import os
-import re
 import signal
 import sys
 
@@ -34,49 +31,31 @@ gi.require_version("PangoCairo", "1.0")
 
 from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noqa: E402
 
-APP_ID = "io.github.speedgtk.SpeedGTK"
-APP_NAME = "SpeedGTK"
-APP_VERSION = "1.9"
-
-BIN = "speedtest"
-# Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
-# Ookla dal vecchio script Python `speedtest-cli`, che ha CLI e output diversi.
-OOKLA_SIGNATURE = "Speedtest by Ookla"
-# Flag accettati dalla CLI dopo che l'utente ha dato il consenso esplicito
-# nell'app: evitano il prompt interattivo su stdin.
-ACCEPT_FLAGS = ["--accept-license", "--accept-gdpr"]
-# Il flag accetta 100–1000 ms (verificato con `speedtest --help`).
-PROGRESS_INTERVAL_MS = 100
-# Al termine del test la barra resta un attimo piena, poi si libera per non
-# sembrare il risultato persistente di un test ancora in corso.
-PROGRESS_HIDE_DELAY_MS = 600
-# Espansioni della pagina: abbastanza lente da rendere fluido il ridimensionamento
-# del tachimetro e delle righe sottostanti.
-LAYOUT_TRANSITION_DURATION_MS = 600
-# I pulsanti che accompagnano il risultato devono comparire rapidamente, senza
-# rubare attenzione alla chiusura del test.
-RESULT_ACTION_TRANSITION_DURATION_MS = 330
-# Secondi di grazia fra SIGTERM e SIGKILL quando si annulla un test.
-KILL_GRACE_SECONDS = 3
-
-PLACEHOLDER = "—"
-
-PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
-SOURCE_PO_DIR = os.path.abspath(os.path.join(PACKAGE_DIR, "..", "..", "po"))
-INSTALLED_PO_DIR = os.path.join(os.path.dirname(PACKAGE_DIR), "po")
-# Durante lo sviluppo le traduzioni vivono accanto allo script. L'installer le
-# copia invece sia lo script sia i cataloghi in $prefix/share/speedgtk. La
-# variabile consente inoltre a pacchetti di terze parti di scegliere un percorso
-# diverso, senza modificare il codice.
-PO_DIR = os.environ.get(
-    "SPEEDGTK_PO_DIR",
-    SOURCE_PO_DIR if os.path.isdir(SOURCE_PO_DIR) else INSTALLED_PO_DIR,
+from .config import (  # noqa: E402
+    ACCEPT_FLAGS,
+    APP_ID,
+    APP_NAME,
+    APP_VERSION,
+    BIN,
+    HISTORY_LIMIT,
+    KILL_GRACE_SECONDS,
+    LAYOUT_TRANSITION_DURATION_MS,
+    OOKLA_SIGNATURE,
+    PLACEHOLDER,
+    PROGRESS_HIDE_DELAY_MS,
+    PROGRESS_INTERVAL_MS,
+    RESULT_ACTION_TRANSITION_DURATION_MS,
 )
-
-# Preferenze e storico: file JSON nelle directory standard dell'utente.
-SETTINGS_PATH = os.path.join(GLib.get_user_config_dir(), "speedgtk", "settings.json")
-HISTORY_PATH = os.path.join(GLib.get_user_data_dir(), "speedgtk", "history.json")
-HISTORY_LIMIT = 200
+from .domain.history import sorted_history_entries  # noqa: E402
+from .formatting import clean_version, format_number, format_timestamp, mbps  # noqa: E402
+from .i18n import (  # noqa: E402
+    LANGUAGE_ORDER,
+    TRANSLATIONS,
+    N_,
+    _,
+    language_names,
+)
+from .storage import History, Settings  # noqa: E402
 
 # Righe che la CLI scrive su stderr anche quando va tutto bene (informativa
 # privacy alla prima esecuzione): non sono errori e non vanno mostrate.
@@ -94,14 +73,6 @@ BENIGN_STDERR = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Traduzioni
-# ---------------------------------------------------------------------------
-def N_(message):
-    """Marca una stringa per l'estrazione; la traduzione avviene poi con _()."""
-    return message
-
-
 HISTORY_SORTS = (
     ("date", N_("Sort by date (default)")),
     ("download", N_("Best download")),
@@ -116,152 +87,8 @@ THEME_OPTIONS = (
     ("dark", N_("Dark")),
 )
 
-# La maggior parte dell'uso quotidiano della connessione dipende dal download,
-# ma l'upload resta abbastanza rilevante da incidere sulla classifica finale.
-OVERALL_DOWNLOAD_WEIGHT = 0.7
-OVERALL_UPLOAD_WEIGHT = 0.3
 
-
-def po_unquote(token):
-    """Toglie le virgolette e le sequenze di escape di una stringa .po."""
-    token = token.strip()
-    if len(token) >= 2 and token.startswith('"') and token.endswith('"'):
-        token = token[1:-1]
-    return (
-        token.replace("\\\\", "\x00")
-        .replace('\\"', '"')
-        .replace("\\n", "\n")
-        .replace("\\t", "\t")
-        .replace("\x00", "\\")
-    )
-
-
-def parse_po(text):
-    """Parser .po minimo: msgid/msgstr, stringhe su più righe, fuzzy saltate.
-
-    Basta per questa app, che non usa né plurali né contesti, ed evita di
-    dover compilare i .po in .mo con msgfmt.
-    """
-    catalog = {}
-    msgid = None
-    msgstr = None
-    where = None  # "id" oppure "str": dove finiscono le righe di continuazione
-    fuzzy = False
-    next_fuzzy = False
-
-    def store():
-        if msgid and msgstr and not fuzzy:
-            catalog[msgid] = msgstr
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        if line.startswith("#"):
-            if line.startswith("#,") and "fuzzy" in line:
-                next_fuzzy = True
-            continue
-        if line.startswith("msgid "):
-            store()  # la voce precedente è finita
-            msgid, msgstr, where = po_unquote(line[6:]), None, "id"
-            fuzzy, next_fuzzy = next_fuzzy, False
-        elif line.startswith("msgstr "):
-            msgstr, where = po_unquote(line[7:]), "str"
-        elif line.startswith('"') and where == "id":
-            msgid += po_unquote(line)
-        elif line.startswith('"') and where == "str":
-            msgstr += po_unquote(line)
-        else:
-            # msgctxt, msgid_plural, msgstr[n]: non usati, la voce si scarta
-            where = None
-    store()
-    return catalog
-
-
-class Translations:
-    """Catalogo di traduzioni caricato dai file .po presenti in `directory`."""
-
-    SOURCE_CODE = "en"  # lingua in cui sono scritti i msgid
-
-    def __init__(self, directory=PO_DIR):
-        self._directory = directory
-        self._catalog = {}
-        self._code = self.SOURCE_CODE
-        self._requested_code = self.SOURCE_CODE
-
-    @property
-    def code(self):
-        return self._code
-
-    @property
-    def follows_system(self):
-        """True quando l'utente ha scelto di seguire la lingua di sistema."""
-        return self._requested_code == "system"
-
-    def available(self):
-        """Codici lingua utilizzabili: l'inglese più un codice per ogni .po."""
-        codes = {self.SOURCE_CODE}
-        try:
-            for name in os.listdir(self._directory):
-                if name.endswith(".po"):
-                    codes.add(name[: -len(".po")])
-        except OSError:
-            pass
-        return codes
-
-    def use(self, code):
-        """Attiva una lingua; "system" segue le impostazioni di sistema."""
-        self._requested_code = code or "system"
-        if not code or code == "system":
-            code = self._system_code()
-        self._code = code
-        self._catalog = {} if code == self.SOURCE_CODE else self._load(code)
-        return code
-
-    def _system_code(self):
-        available = self.available()
-        for name in GLib.get_language_names():
-            code = name.split(".")[0].split("_")[0].lower()
-            if code in available:
-                return code
-        return self.SOURCE_CODE
-
-    def _load(self, code):
-        try:
-            with open(os.path.join(self._directory, f"{code}.po"), encoding="utf-8") as handle:
-                return parse_po(handle.read())
-        except OSError:
-            return {}
-
-    def gettext(self, message):
-        return self._catalog.get(message) or message
-
-
-TRANSLATIONS = Translations()
-
-
-def _(message):
-    return TRANSLATIONS.gettext(message)
-
-
-# Lingue offerte nelle preferenze, nell'ordine in cui compaiono. I nomi sono
-# tradotti come tutto il resto: nell'app in tedesco si legge "Italienisch".
-LANGUAGE_ORDER = ("system", "it", "en", "de", "fr", "es", "ru")
-
-
-def language_names():
-    return {
-        "system": _("Same as the system"),
-        "it": _("Italian"),
-        "en": _("English"),
-        "de": _("German"),
-        "fr": _("French"),
-        "es": _("Spanish"),
-        "ru": _("Russian"),
-    }
-
-
-# Errori della CLI: (frammento da cercare, riga breve per il toast, spiegazione).
+# CLI errors are mapped to a short toast and an optional detailed explanation.
 # La riga breve deve stare in un toast senza troncarsi, i dettagli vanno nel
 # dialogo che si apre dal pulsante "Details".
 CLI_ERROR_HINTS = (
@@ -371,113 +198,6 @@ SCALE_TRANSITION_DURATION_MS = 450
 STOPS_DOWNLOAD = ((0.0, (0.07, 0.64, 0.96)), (0.55, (0.25, 0.92, 0.80)), (1.0, (0.43, 0.94, 0.48)))
 STOPS_UPLOAD = ((0.0, (0.42, 0.29, 0.90)), (0.55, (0.66, 0.36, 0.95)), (1.0, (0.85, 0.47, 0.98)))
 
-try:  # i numeri seguono le convenzioni locali (2.208,06 in italiano)
-    locale.setlocale(locale.LC_NUMERIC, "")
-except locale.Error:
-    pass
-
-# Convenzioni per le lingue offerte dall'app: (separatore decimale, migliaia).
-# Il formato di partenza di Python è sempre inglese e viene convertito in
-# format_number(); usarle qui evita di dipendere dalla lingua di Ubuntu.
-NUMBER_SEPARATORS = {
-    "en": (".", ","),
-    "it": (",", "."),
-    "de": (",", "."),
-    "es": (",", "."),
-    "fr": (",", "\u202f"),  # spazio sottile inseparabile
-    "ru": (",", "\u00a0"),  # spazio inseparabile
-}
-
-
-class Settings:
-    """Preferenze persistite in un JSON. Salvataggio a ogni modifica."""
-
-    DEFAULTS = {
-        "plain_ui": False,
-        "accent_colors": False,
-        "auto_range": True,
-        "measurement_decimals": 2,
-        "color_scheme": "system",
-        "keep_history": True,
-        "language": "system",
-        "ookla_terms_accepted": False,
-        "last_auto_server": None,  # descrizione dell'ultimo server scelto in automatico
-    }
-
-    def __init__(self, path=SETTINGS_PATH):
-        self._path = path
-        self._values = dict(self.DEFAULTS)
-        try:
-            with open(path, encoding="utf-8") as handle:
-                stored = json.load(handle)
-        except (OSError, ValueError):
-            return
-        if isinstance(stored, dict):
-            self._values.update({k: v for k, v in stored.items() if k in self.DEFAULTS})
-
-    def __getitem__(self, key):
-        return self._values.get(key, self.DEFAULTS.get(key))
-
-    def override(self, key, value):
-        """Cambia il valore solo per questa sessione (opzioni da riga di comando)."""
-        self._values[key] = value
-
-    def set(self, key, value):
-        if self._values.get(key) == value:
-            return
-        self._values[key] = value
-        self.save()
-
-    def save(self):
-        try:
-            GLib.mkdir_with_parents(os.path.dirname(self._path), 0o700)
-            with open(self._path, "w", encoding="utf-8") as handle:
-                json.dump(self._values, handle, indent=1, ensure_ascii=False)
-        except OSError:
-            pass  # preferenze non salvabili: non è un motivo per disturbare l'utente
-
-
-class History:
-    """Storico dei test riusciti, dal più recente al più vecchio."""
-
-    def __init__(self, path=HISTORY_PATH, limit=HISTORY_LIMIT):
-        self._path = path
-        self._limit = limit
-        self._entries = []
-        try:
-            with open(path, encoding="utf-8") as handle:
-                stored = json.load(handle)
-        except (OSError, ValueError):
-            return
-        if isinstance(stored, list):
-            self._entries = [entry for entry in stored if isinstance(entry, dict)][:limit]
-
-    @property
-    def path(self):
-        return self._path
-
-    @property
-    def entries(self):
-        return list(self._entries)
-
-    def add(self, entry):
-        self._entries.insert(0, entry)
-        del self._entries[self._limit :]
-        self._save()
-
-    def clear(self):
-        self._entries = []
-        self._save()
-
-    def _save(self):
-        try:
-            GLib.mkdir_with_parents(os.path.dirname(self._path), 0o700)
-            with open(self._path, "w", encoding="utf-8") as handle:
-                json.dump(self._entries, handle, indent=1, ensure_ascii=False)
-        except OSError:
-            pass
-
-
 class ServerItem(GObject.Object):
     """Voce dell'elenco server: `label` per la riga chiusa, title/subtitle nel menu."""
 
@@ -493,57 +213,6 @@ class ServerItem(GObject.Object):
         self.props.title = title
         self.props.subtitle = subtitle
         self.server_id = server_id  # None = scelta automatica
-
-
-def mbps(bandwidth_bytes_per_second):
-    """La CLI Ookla esprime `bandwidth` in BYTE al secondo.
-
-    I Mbps si ottengono moltiplicando per 8 (bit) e dividendo per 1e6, cioè in
-    base decimale — è la stessa convenzione usata da speedtest.net.
-    """
-    return bandwidth_bytes_per_second * 8 / 1e6
-
-
-def format_number(value, decimals=2):
-    """Formatta un numero secondo la lingua scelta nell'app.
-
-    LC_NUMERIC descrive la lingua del sistema, non necessariamente quella
-    selezionata nelle preferenze di SpeedGTK: per esempio, un'app in inglese
-    su Ubuntu in italiano deve mostrare 1,234.56 e non 1.234,56. Solo
-    l'opzione "Same as the system" continua quindi a consultare la locale.
-    """
-    try:
-        rendered = f"{float(value):,.{decimals}f}"
-    except (ValueError, TypeError):
-        return str(value)
-
-    if TRANSLATIONS.follows_system:
-        convention = locale.localeconv()
-        decimal = convention.get("decimal_point") or "."
-        grouping = convention.get("thousands_sep") or ""
-    else:
-        decimal, grouping = NUMBER_SEPARATORS.get(TRANSLATIONS.code, NUMBER_SEPARATORS["en"])
-
-    # Il formato Python è volutamente il punto di partenza canonico inglese;
-    # i due rimpiazzi con un segnaposto evitano che punto e virgola si pestino.
-    return rendered.replace(",", "\x00").replace(".", decimal).replace("\x00", grouping)
-
-
-def format_timestamp(iso_text):
-    """ "2026-08-08T09:27:46Z" → data e ora locali leggibili."""
-    stamp = GLib.DateTime.new_from_iso8601(iso_text or "", None)
-    if stamp is None:
-        return iso_text or PLACEHOLDER
-    # Formato traducibile: ogni lingua può disporre giorno e mese a modo suo.
-    return stamp.to_local().format(_("%d/%m/%Y %H:%M"))
-
-
-def clean_version(version_output):
-    """Prima riga di `speedtest --version` ridotta all'essenziale."""
-    match = re.search(r"Speedtest by Ookla\s+([0-9][0-9.]*)", version_output or "")
-    if match:
-        return "{} {}".format(_("Speedtest CLI"), match.group(1))
-    return _("Speedtest CLI")
 
 
 def call_later(func, *args):
@@ -2363,7 +2032,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def _build_history_content(self, sort_order="date"):
-        entries = self._sorted_history_entries(sort_order)
+        entries = sorted_history_entries(self._history.entries, sort_order)
         if not entries:
             return Adw.StatusPage(
                 icon_name="document-open-recent-symbolic",
@@ -2393,100 +2062,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         page = Adw.PreferencesPage()
         page.add(group)
         return page
-
-    @staticmethod
-    def _history_metric(entry, key):
-        """Restituisce solo misure finite, per gestire anche vecchi JSON corrotti."""
-        value = entry.get(key)
-        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-            return float(value)
-        return None
-
-    @staticmethod
-    def _percentile(values, fraction):
-        """Percentile interpolato, senza dipendere da versioni specifiche di Python."""
-        position = (len(values) - 1) * fraction
-        lower = math.floor(position)
-        upper = math.ceil(position)
-        if lower == upper:
-            return values[lower]
-        return values[lower] + (values[upper] - values[lower]) * (position - lower)
-
-    @classmethod
-    def _historical_mean(cls, entries, key):
-        """Media storica, scartando gli outlier bassi con la recinzione di Tukey."""
-        values = sorted(
-            value
-            for entry in entries
-            if (value := cls._history_metric(entry, key)) is not None and value > 0
-        )
-        if not values:
-            return None
-
-        # Con pochi test non è possibile distinguere una normale oscillazione da
-        # un outlier. Da quattro misure in poi, la soglia inferiore di Tukey
-        # elimina solo valori eccezionalmente bassi, senza penalizzare variazioni
-        # realistiche della linea.
-        if len(values) >= 4:
-            first_quartile = cls._percentile(values, 0.25)
-            third_quartile = cls._percentile(values, 0.75)
-            lower_fence = first_quartile - 1.5 * (third_quartile - first_quartile)
-            retained = [value for value in values if value >= lower_fence]
-            if retained:
-                values = retained
-
-        return sum(values) / len(values)
-
-    @staticmethod
-    def _sort_history_entries(entries, value_for_entry, reverse=False):
-        """Ordina valori validi davanti a quelli mancanti, conservando le parità."""
-        def sort_key(indexed_entry):
-            index, entry = indexed_entry
-            value = value_for_entry(entry)
-            if value is None:
-                return (1, 0, index)
-            return (0, -value if reverse else value, index)
-
-        return [entry for _index, entry in sorted(enumerate(entries), key=sort_key)]
-
-    def _sorted_history_entries(self, sort_order):
-        entries = self._history.entries
-        if sort_order == "download":
-            return self._sort_history_entries(
-                entries, lambda entry: self._history_metric(entry, "download"), reverse=True
-            )
-        if sort_order == "upload":
-            return self._sort_history_entries(
-                entries, lambda entry: self._history_metric(entry, "upload"), reverse=True
-            )
-        if sort_order == "ping":
-            return self._sort_history_entries(
-                entries, lambda entry: self._history_metric(entry, "ping")
-            )
-        if sort_order == "overall":
-            download_mean = self._historical_mean(entries, "download")
-            upload_mean = self._historical_mean(entries, "upload")
-            if download_mean is not None and upload_mean is not None:
-                def overall_score(entry):
-                    download = self._history_metric(entry, "download")
-                    upload = self._history_metric(entry, "upload")
-                    if download is None or upload is None:
-                        return None
-                    return (
-                        OVERALL_DOWNLOAD_WEIGHT * download / download_mean
-                        + OVERALL_UPLOAD_WEIGHT * upload / upload_mean
-                    )
-
-                return self._sort_history_entries(entries, overall_score, reverse=True)
-
-        # I timestamp della CLI sono ISO 8601 in UTC, quindi l'ordinamento
-        # lessicografico coincide con quello cronologico. Le righe senza data
-        # restano in fondo e le parità mantengono il loro ordine nello storico.
-        return sorted(
-            entries,
-            key=lambda entry: entry.get("timestamp") if isinstance(entry.get("timestamp"), str) else "",
-            reverse=True,
-        )
 
     def _history_number(self, entry, key, decimals=None):
         if decimals is None:
