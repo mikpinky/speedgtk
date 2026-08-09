@@ -45,20 +45,18 @@ from .widgets import PhaseProgress
 class SpeedGTKWindow(Adw.ApplicationWindow):
     def __init__(self, application, settings, history):
         super().__init__(application=application, title=APP_NAME)
-        # Le dimensioni GTK sono in pixel logici: il compositor applica il
-        # fattore di scala del monitor, quindi questi 984 px (+20%) restano
-        # proporzionati sia su display standard sia su schermi HiDPI/4K.
+        # GTK uses logical pixels; the compositor applies monitor scaling.
         self.set_default_size(560, 984)
 
         self._settings = settings
         self._history = history
-        self._run = None  # SpeedtestRun in corso (None = nessun test attivo)
+        self._run = None
         self._servers_cancellable = None
-        self._last_error = None  # messaggio dell'ultimo evento di errore
+        self._last_error = None
         self._result_url = None
-        self._auto_server = True  # il test in corso usa la scelta automatica?
-        self._has_run = False  # almeno un test concluso in questa finestra
-        self._progress_hide_source = None  # timer della barra al termine del test
+        self._auto_server = True
+        self._has_run = False
+        self._progress_hide_source = None
         self._result_action_reveal_source = None
 
         self._toasts = Adw.ToastOverlay()
@@ -90,8 +88,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", callback)
             self.add_action(action)
-        # Azione richiamata dal pulsante "Details" del toast d'errore: il testo
-        # completo viaggia come parametro, così non serve tenerlo da parte.
+        # Carry error details in the action parameter instead of window state.
         details = Gio.SimpleAction.new("error-details", GLib.VariantType.new("s"))
         details.connect("activate", lambda _action, param: self._present_error(param.get_string()))
         self.add_action(details)
@@ -114,9 +111,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         else:
             self._present_ookla_terms()
 
-    # ------------------------------------------------------------------
-    # Costruzione della UI
-    # ------------------------------------------------------------------
     def _build_loading_page(self):
         return Adw.StatusPage(
             icon_name="preferences-system-network-symbolic",
@@ -141,9 +135,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._measurements = MeasurementsView(self._settings)
         box.append(self._measurements)
 
-        # --- Avvio / annullamento e azioni sul risultato ---
-        # I Revealer laterali sono collassati all'avvio: non lasciano alcuno
-        # spazio vuoto finché non esiste un risultato da gestire.
+        # Collapsed revealers keep result actions from reserving empty space.
         test_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         test_actions.set_halign(Gtk.Align.CENTER)
         test_actions.set_valign(Gtk.Align.CENTER)
@@ -186,8 +178,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
         scroller.set_child(Adw.Clamp(child=box, maximum_size=620))
 
-        # La barra di avanzamento resta ancorata in fondo alla finestra, come
-        # nella pagina web di Ookla.
+        # Keep progress anchored below the scrolling content.
         self._progress = PhaseProgress()
         column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         column.append(scroller)
@@ -196,7 +187,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
     @staticmethod
     def _result_action_revealer(button):
-        """Contenitore collassabile con l'animazione nativa dell'azione."""
+        """Wrap a result action in a native collapse animation."""
         revealer = Gtk.Revealer()
         revealer.set_transition_type(Gtk.RevealerTransitionType.SWING_DOWN)
         revealer.set_transition_duration(RESULT_ACTION_TRANSITION_DURATION_MS)
@@ -242,7 +233,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         )
 
     def _accepted_cli_flags(self):
-        """Restituisce i flag di consenso solo dopo l'azione esplicita dell'utente."""
+        """Return consent flags only after explicit user acceptance."""
         return ACCEPT_FLAGS if self._settings["ookla_terms_accepted"] else []
 
     def _check_binary(self):
@@ -262,8 +253,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             return
 
         first_line = next((l.strip() for l in stdout_text.splitlines() if l.strip()), "")
-        # Sottotitolo essenziale ("Speedtest CLI 1.2.0.84"); la riga completa,
-        # con build e piattaforma, resta nel tooltip.
+        # Keep build and platform details in the tooltip, not the title bar.
         self._window_title.set_subtitle(clean_version(first_line))
         self._window_title.set_tooltip_text(first_line)
         self._stack.set_visible_child_name("main")
@@ -290,8 +280,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
         self._refresh_button.set_sensitive(False)
         self._server_picker.set_loading()
-        # Il consenso è stato richiesto esplicitamente prima del controllo
-        # della CLI; i flag evitano ora il prompt interattivo su stdin.
+        # Consent is already recorded, so the CLI must not prompt on stdin.
         run_and_capture(
             [BIN, "--servers", "--format=json"] + self._accepted_cli_flags(),
             self._on_servers_done,
@@ -327,7 +316,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             return
         if self._run is not None:
             self._set_phase("cancel", _("Cancelling…"))
-            self._start_button.set_sensitive(False)  # riabilitato in _on_run_done
+            self._start_button.set_sensitive(False)
             self._run.cancel()
             return
 
@@ -378,7 +367,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._set_result_actions_visible(False)
 
     def _set_result_actions_visible(self, visible):
-        """Mostra prima l'azione di reset e poi, se presente, quella online."""
+        """Reveal reset first, followed by the optional online result action."""
         self._cancel_result_action_delay()
         if not visible:
             self._set_result_action_visible(
@@ -415,12 +404,12 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
     @staticmethod
     def _set_result_action_visible(revealer, button, visible):
-        """Accoppia il collasso del layout a un pulsante realmente attivo."""
+        """Keep layout visibility and button sensitivity in sync."""
         button.set_sensitive(visible)
         revealer.set_reveal_child(visible)
 
     def _on_clear_result_clicked(self, _button):
-        """Torna allo stato iniziale e richiude i dettagli del test appena visto."""
+        """Return to the initial state and collapse the previous result."""
         if self._run is not None:
             return
         self._has_run = False
@@ -432,9 +421,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         if self._result_url:
             Gtk.show_uri(self, self._result_url, 0)
 
-    # ------------------------------------------------------------------
-    # Aggiornamento delle due viste
-    # ------------------------------------------------------------------
     def _set_phase(self, phase, text):
         self._measurements.set_phase(phase, text)
         self._progress.set_phase(phase)
@@ -449,10 +435,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         elif event_type == "ping":
             data = event.get("ping", {})
             self._set_phase("ping", _("Measuring ping…"))
-            # La CLI espone un progresso anche per il ping, che arriva a 100%
-            # in pochi istanti. La barra in basso rappresenta però il
-            # trasferimento dati: mostrarlo qui la faceva sembrare completata
-            # prima ancora che iniziasse il download.
+            # Ignore ping progress: the bottom bar represents data transfer.
             self._measurements.show_latency(
                 "idle", data.get("latency"), data.get("jitter")
             )
@@ -460,8 +443,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         elif event_type in ("download", "upload"):
             data = event.get(event_type, {})
             is_download = event_type == "download"
-            # Il cambio di fase va prima del valore: è quello che fa tornare
-            # l'ago a zero prima di ripartire con la fase nuova.
+            # Change phase first so the needle can reset before the new value.
             self._set_phase(event_type, _("Download…") if is_download else _("Upload…"))
             self._set_progress(data.get("progress"))
             bandwidth = data.get("bandwidth")
@@ -475,8 +457,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             self._apply_result(event)
 
         elif event_type == "error" or (event_type == "log" and event.get("level") == "error"):
-            # Memorizzato e mostrato in un toast quando il processo termina:
-            # così un errore non viene sovrascritto dagli eventi successivi.
+            # Retain the error until process completion to avoid later events
+            # overwriting it.
             self._last_error = str(event.get("message") or event.get("error") or "")
 
     def _apply_result(self, event):
@@ -495,7 +477,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._schedule_progress_hide()
 
     def _schedule_progress_hide(self):
-        """Lascia visibile il completamento upload per un breve istante."""
+        """Keep completed upload progress visible briefly."""
         self._cancel_progress_hide()
         self._progress_hide_source = GLib.timeout_add(
             PROGRESS_HIDE_DELAY_MS, self._hide_finished_progress
@@ -508,8 +490,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
     def _hide_finished_progress(self):
         self._progress_hide_source = None
-        # Un nuovo test può essere partito mentre il timer era in attesa:
-        # in quel caso la barra appartiene già alla sua nuova fase.
+        # A newer run may own the progress bar by the time this timer fires.
         if self._measurements.phase == "done":
             self._progress.set_fraction(0.0)
         return GLib.SOURCE_REMOVE
@@ -523,9 +504,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         if isinstance(progress, (int, float)):
             self._progress.set_fraction(min(max(float(progress), 0.0), 1.0))
 
-    # ------------------------------------------------------------------
-    # Fine del test
-    # ------------------------------------------------------------------
     def _on_run_done(self, status, stderr_text, cancelled):
         self._run = None
         self._has_run = True
@@ -553,13 +531,11 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             self._toast(short, detail or raw)
             return
 
-        # Uscita pulita. Nota: stderr NON vuoto non è di per sé un errore — alla
-        # prima esecuzione la CLI ci scrive l'informativa GDPR anche quando il
-        # test riesce, quindi lo segnaliamo solo con exit code diverso da zero.
+        # Privacy notices may appear on stderr after a successful first run.
         self._set_result_actions_visible(True)
 
     def _toast(self, message, detail=None):
-        """Toast breve; se c'è un testo lungo va nel dialogo dei dettagli."""
+        """Show a short toast and route longer text to the details dialog."""
         toast = Adw.Toast.new(message)
         toast.set_timeout(6)
         if detail and detail != message:
@@ -578,5 +554,5 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _on_close_request(self, *_args):
         self._cancel_progress_hide()
         if self._run is not None:
-            self._run.kill()  # niente processi orfani
+            self._run.kill()
         return False

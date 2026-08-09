@@ -8,10 +8,10 @@ from ..theme import gradient_stops, rgb_at, text_rgba
 
 
 class PhaseIcon(Gtk.DrawingArea):
-    """Freccia in un cerchio: grigia finché la sua fase non entra in gioco.
+    """Circled transfer arrow, dimmed until its phase becomes active.
 
-    Disegnata in Cairo per poterle dare i colori Ookla senza CSS custom (le
-    icone simboliche prenderebbero il colore dal foglio di stile).
+    Cairo drawing allows the Ookla palette without custom CSS that would also
+    affect symbolic icons.
     """
 
     __gtype_name__ = "PhaseIcon"
@@ -66,11 +66,10 @@ class PhaseIcon(Gtk.DrawingArea):
 
 
 class LatencyIcon(Gtk.DrawingArea):
-    """Indicatore della latenza idle, in download o in upload.
+    """Idle, download, or upload latency indicator.
 
-    Il ping idle usa le frecce orizzontali gialle; durante i trasferimenti le
-    frecce verticali riusano i colori verde acqua e violetto delle rispettive
-    intestazioni. Rimangono attenuati finché non arriva una misura.
+    Idle ping uses horizontal yellow arrows. Loaded latency uses the matching
+    transfer color and remains dimmed until a measurement arrives.
     """
 
     __gtype_name__ = "LatencyIcon"
@@ -139,7 +138,7 @@ class LatencyIcon(Gtk.DrawingArea):
 
 
 class DetailIcon(Gtk.DrawingArea):
-    """Icona cerchiata per i dettagli di server e provider del risultato."""
+    """Circled server or ISP icon for result details."""
 
     __gtype_name__ = "DetailIcon"
 
@@ -178,8 +177,7 @@ class DetailIcon(Gtk.DrawingArea):
         if self._kind == "isp":
             cr.arc(cx, cy - size * 0.105, size * 0.125, 0, 2 * math.pi)
             cr.stroke()
-            # Busto più basso della testa e schiacciato: la linea resta aperta
-            # e non si sovrappone al cerchio del volto.
+            # Flatten the open torso so it does not overlap the head.
             cr.save()
             cr.translate(cx, cy + size * 0.235)
             cr.scale(1.0, 0.55)
@@ -189,9 +187,7 @@ class DetailIcon(Gtk.DrawingArea):
             cr.stroke()
             return
 
-        # Server: tre piccoli nodi, uno centrale sopra due affiancati.
-        # Riduciamo sia ciascun server sia il gruppo attorno al suo centro,
-        # così gli angoli inferiori non sfiorano il bordo del cerchio.
+        # Keep the three-node server cluster away from the outer circle.
         box_width = size * 0.23
         box_height = size * 0.195
         box_radius = size * 0.028
@@ -209,4 +205,3 @@ class DetailIcon(Gtk.DrawingArea):
             cr.move_to(x + size * 0.035, y + box_height * 0.52)
             cr.line_to(x + box_width - size * 0.035, y + box_height * 0.52)
             cr.stroke()
-

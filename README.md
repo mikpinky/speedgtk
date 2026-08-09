@@ -114,7 +114,7 @@ leaving that user's other preferences intact.
 
 ## Development
 
-Run the basic syntax check with:
+Run the syntax checks and test suite with:
 
 ```bash
 make check
@@ -125,6 +125,10 @@ Run the application directly from the source tree with:
 ```bash
 make run
 ```
+
+The Python package uses a conventional `src/` layout. See
+[`docs/architecture.md`](docs/architecture.md) for module responsibilities and
+dependency rules.
 
 Translations are stored in [`po/`](po/). The project intentionally depends on
 the official Ookla CLI rather than the unrelated Python `speedtest-cli`

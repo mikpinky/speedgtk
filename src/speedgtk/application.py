@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""
-SpeedGTK — frontend GTK4 + libadwaita per la CLI ufficiale `speedtest` di Ookla.
-
-Tutto gira sul main loop di GLib: i sottoprocessi sono lanciati con Gio.Subprocess
-e lo stdout viene letto riga per riga con Gio.DataInputStream.read_line_async().
-Niente modulo `subprocess`, niente thread → la UI non si blocca mai.
-
-Due interfacce, intercambiabili dalle preferenze:
-  · tachimetro in stile Ookla disegnato in Cairo (predefinita)
-  · label testuali GNOME "pure"  (opzione --plain)
-
-Le stringhe sorgente sono in inglese e le traduzioni stanno nei file po/*.po,
-letti direttamente a runtime: non serve né msgfmt né un build system.
-
-Requisiti: GTK 4, libadwaita >= 1.5, PyGObject, e la CLI ufficiale `speedtest`.
-"""
+"""GTK application lifecycle and command-line entry point for SpeedGTK."""
 
 import sys
 
@@ -47,10 +32,10 @@ class SpeedGTKApplication(Adw.Application):
         window.present()
 
     def reload_ui(self, reopen_preferences=False):
-        """Ricostruisce la finestra: serve al cambio di lingua.
+        """Rebuild the window after a language change.
 
-        Tutto lo stato durevole vive in Settings e History, quindi ricreare la
-        finestra è sufficiente e più semplice che ritradurre widget per widget.
+        Durable state lives in Settings and History, so rebuilding is safer and
+        simpler than translating each existing widget in place.
         """
         TRANSLATIONS.use(self._settings["language"])
         previous = self.props.active_window
@@ -88,7 +73,7 @@ def main(argv):
         return 2
 
     settings = Settings()
-    # Le opzioni da riga di comando non sovrascrivono le preferenze salvate.
+    # Command-line flags override this process only, not saved preferences.
     if "--plain" in argv:
         settings.override("plain_ui", True)
     if "--accent" in argv:

@@ -31,9 +31,9 @@ Two details worth knowing:
   translation they become `Italiano`, `Alemão`, `Francês`. Translate them into
   *your* language, not into the language they name.
 - **Add your language name to the other files** if you want it to show up
-  there as well, and add the new code to `LANGUAGE_ORDER` in `speedgtk.py` to
-  control where it sits in the menu (unknown codes still work, they just fall
-  to the end of the known ones).
+  there as well, and add the new code to `LANGUAGE_ORDER` in
+  `src/speedgtk/i18n.py` to control where it sits in the menu (unknown codes
+  still work, they just fall to the end of the known ones).
 
 ## Placeholders
 
@@ -63,9 +63,10 @@ msgfmt --check --statistics -o /dev/null pt.po
 Regenerate the template and merge it into the existing translations:
 
 ```bash
-xgettext --language=Python --keyword=_ --keyword=N_ --from-code=UTF-8 \
-         --package-name=SpeedGTK --sort-by-file \
-         -o po/speedgtk.pot speedgtk.py
+find src/speedgtk -type f -name '*.py' -print0 | sort -z | \
+  xargs -0 xgettext --language=Python --keyword=_ --keyword=N_ \
+    --from-code=UTF-8 --package-name=SpeedGTK --sort-by-file \
+    -o po/speedgtk.pot
 for f in po/*.po; do msgmerge --update --backup=none "$f" po/speedgtk.pot; done
 ```
 

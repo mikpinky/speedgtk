@@ -7,11 +7,10 @@ from ..theme import gradient_stops, text_rgba
 
 
 class PhaseProgress(Gtk.DrawingArea):
-    """Barra di avanzamento con la sfumatura della fase in corso.
+    """Progress bar colored for the active transfer phase.
 
-    Una Gtk.ProgressBar userebbe il colore di accento del tema; qui serve il
-    verde acqua del download e il violetto dell'upload, e l'accento solo se
-    l'utente lo ha scelto nelle preferenze.
+    Gtk.ProgressBar always follows the theme accent, while this widget uses the
+    download/upload palette unless the user explicitly enables accent colors.
     """
 
     __gtype_name__ = "PhaseProgress"
@@ -39,9 +38,9 @@ class PhaseProgress(Gtk.DrawingArea):
         if phase in ("download", "upload"):
             new_phase = phase
         elif phase in ("idle", "ping"):
-            new_phase = "download"  # il ping usa i colori del download, come Ookla
+            new_phase = "download"
         else:
-            return  # 'done': la barra piena resta del colore dell'ultima misura
+            return  # Keep the completed bar in the last transfer color.
         if new_phase != self._phase:
             self._phase = new_phase
             self.queue_draw()
@@ -59,12 +58,11 @@ class PhaseProgress(Gtk.DrawingArea):
         filled = width * self._fraction
         if filled <= 0.0:
             return
-        # La sfumatura è distesa su tutta la larghezza e poi ritagliata: così il
-        # colore dipende dal punto della barra, non da quanto è piena.
+        # Anchor the gradient to the full width so its colors do not shift as
+        # the filled fraction changes.
         gradient = cairo.LinearGradient(0, 0, width, 0)
         for position, rgb in gradient_stops(self, self._phase, self._use_accent):
             gradient.add_color_stop_rgb(position, *rgb)
         cr.set_source(gradient)
         cr.rectangle(0, 0, filled, height)
         cr.fill()
-

@@ -33,25 +33,17 @@ SCALE_TRANSITION_DURATION_MS = 450
 
 
 class SpeedGauge(Gtk.DrawingArea):
-    """Tachimetro in stile Ookla, interamente disegnato in Cairo.
+    """Animated speed gauge drawn entirely with Cairo.
 
-    API pubblica:
-      · property `value`      — valore mostrato dall'ago. È la property animata:
-                                si imposta da sola, non va scritta a mano.
-      · set_target(mbps)      — valore da raggiungere; l'ago ci arriva interpolando
-      · set_phase(phase)      — 'idle' | 'ping' | 'download' | 'upload' | 'done'
-      · reset()               — riporta l'ago a zero
-      · property `use_accent_color`, `max_value` (sola lettura), `auto_range`
-
-    Tutte le misure del disegno sono frazioni di min(width, height): la resa
-    resta identica ridimensionando la finestra e su schermi HiDPI.
+    Geometry is expressed as fractions of the smaller widget dimension, keeping
+    the same proportions during resize and on HiDPI displays.
     """
 
     __gtype_name__ = "SpeedGauge"
 
     PHASES = ("idle", "ping", "download", "upload", "done")
 
-    # Geometria, in frazioni della dimensione minore del widget.
+    # Geometry as fractions of the smaller widget dimension.
     R_OUTER = 0.470
     RING = 0.068
     TICK_LEN = 0.028
@@ -68,9 +60,7 @@ class SpeedGauge(Gtk.DrawingArea):
     UNIT_OFFSET = 0.335
     VIGNETTE_DITHER_SIZE = 64
 
-    # Ritocchi della scala fino a 1 Gbps. Modifica liberamente le coppie
-    # (orizzontale, verticale): ogni unità corrisponde alla larghezza media di
-    # una lettera dell'etichetta, con x positivo verso est e y verso sud.
+    # Optical label offsets measured in average label-character widths.
     STANDARD_TICK_OFFSETS = {
         0: (-0.354, 0.354),
         1: (-0.650, 0.140),
@@ -80,17 +70,15 @@ class SpeedGauge(Gtk.DrawingArea):
         50: (0.130, -0.310),
     }
 
-    # Offset in "larghezze di lettera" per le tacche della sola scala 10 Gbps.
-    # La scala logaritmica mette alcuni numeri particolarmente vicini ai tagli;
-    # questi ritocchi li allontanano senza alterare la geometria delle altre scale.
+    # The logarithmic 10 Gbps scale needs separate collision adjustments.
     EXTENDED_TICK_OFFSETS = {
-        0: (-0.354, 0.354),       # mezza lettera a sud-ovest
-        1: (-0.462, 0.191),       # mezza lettera verso ovest-sud-ovest
-        5: (-0.700, 0.000),       # mezza lettera a ovest
-        50: (0.000, -0.250),      # un quarto a nord
-        100: (0.000, -0.300),     # un quarto a nord
-        300: (-0.088, -0.088),    # un ottavo a nord-ovest
-        2500: (-0.500, 0.000),    # mezza lettera a ovest
+        0: (-0.354, 0.354),
+        1: (-0.462, 0.191),
+        5: (-0.700, 0.000),
+        50: (0.000, -0.250),
+        100: (0.000, -0.300),
+        300: (-0.088, -0.088),
+        2500: (-0.500, 0.000),
     }
 
     def __init__(self, **kwargs):
@@ -98,8 +86,8 @@ class SpeedGauge(Gtk.DrawingArea):
         self._value = 0.0
         self._target = 0.0
         self._phase = "idle"
-        self._color_phase = "download"  # fase da cui prendere i colori dell'arco
-        self._settling = False  # ritorno a zero fra due fasi in corso
+        self._color_phase = "download"
+        self._settling = False
         self._scale_index = GAUGE_DEFAULT_SCALE
         self._scale_from_index = None
         self._scale_progress = 1.0
@@ -109,13 +97,11 @@ class SpeedGauge(Gtk.DrawingArea):
         self._vignette_dither_surface = None
         self._vignette_dither_key = None
 
-        # Dimensione naturale: con vexpand il quadrante cresce se c'è spazio.
         self.set_content_width(330)
         self.set_content_height(330)
         self.set_draw_func(self._draw)
 
-        # Animazione: un target sulla property `value`, così l'unica cosa che
-        # muove l'ago (e quindi che ridisegna) è il tick dell'animazione.
+        # Only animation ticks update `value` and trigger redraws.
         self._animation = Adw.TimedAnimation.new(
             self, 0.0, 0.0, TRACK_DURATION_MS, Adw.PropertyAnimationTarget.new(self, "value")
         )
@@ -132,31 +118,26 @@ class SpeedGauge(Gtk.DrawingArea):
         self._scale_animation.set_easing(Adw.Easing.EASE_IN_OUT_CUBIC)
         self._scale_animation.connect("done", self._on_scale_animation_done)
 
-        # Cambi di tema (chiaro/scuro, colore di accento) → ridisegno.
+        # Theme and accent changes require a redraw without changing state.
         manager = Adw.StyleManager.get_default()
         known = {spec.name for spec in Adw.StyleManager.list_properties()}
         for name in ("dark", "accent-color"):
             if name in known:
                 manager.connect(f"notify::{name}", lambda *_args: self.queue_draw())
 
-    # ------------------------------------------------------------------
-    # Property
-    # ------------------------------------------------------------------
     @GObject.Property(type=float, default=0.0)
     def value(self):
-        """Valore attualmente indicato dall'ago (Mbps)."""
+        """Value currently shown by the needle, in Mbps."""
         return self._value
 
     @value.setter
     def value(self, new_value):
         self._value = float(new_value)
-        # Unico queue_draw() legato al valore: ci arriva l'animazione, non gli
-        # eventi del test.
         self.queue_draw()
 
     @GObject.Property(type=bool, default=False)
     def use_accent_color(self):
-        """Se True usa il colore di accento del tema invece dei colori Ookla."""
+        """Whether to use the theme accent instead of the Ookla palette."""
         return self._use_accent
 
     @use_accent_color.setter
@@ -166,7 +147,7 @@ class SpeedGauge(Gtk.DrawingArea):
 
     @GObject.Property(type=bool, default=True)
     def auto_range(self):
-        """Se True la scala sale di livello quando la velocità supera il fondoscala."""
+        """Whether the gauge expands its scale when the speed exceeds it."""
         return self._auto_range
 
     @auto_range.setter
@@ -179,7 +160,7 @@ class SpeedGauge(Gtk.DrawingArea):
 
     @GObject.Property(type=float, default=1.0)
     def scale_progress(self):
-        """Avanzamento 0→1 dell'animazione fra due scale del tachimetro."""
+        """Animation progress between two gauge scales."""
         return self._scale_progress
 
     @scale_progress.setter
@@ -187,30 +168,26 @@ class SpeedGauge(Gtk.DrawingArea):
         self._scale_progress = min(max(float(progress), 0.0), 1.0)
         self.queue_draw()
 
-    # ------------------------------------------------------------------
-    # Controllo dell'ago
-    # ------------------------------------------------------------------
     def set_target(self, speed):
-        """Valore da raggiungere: l'ago ci va interpolando, non di scatto."""
+        """Animate the needle toward a new speed."""
         speed = max(0.0, float(speed))
         self._target = speed
         if self._auto_range:
             self._grow_range_for(speed)
         if self._settling:
-            # Stiamo tornando a zero fra due fasi: il valore resta in attesa e
-            # verrà inseguito appena l'animazione lenta è finita.
+            # Queue the target until the inter-phase return to zero completes.
             return
         self._animate_to(speed, TRACK_DURATION_MS, Adw.Easing.EASE_OUT_CUBIC)
 
     def set_measurement_decimals(self, decimals):
-        """Aggiorna la precisione del valore grande senza toccare l'animazione."""
+        """Update readout precision without disturbing animation state."""
         decimals = min(max(int(decimals), 0), 2)
         if decimals != self._measurement_decimals:
             self._measurement_decimals = decimals
             self.queue_draw()
 
     def set_phase(self, phase):
-        """Fase del test: decide i colori e il ritorno a zero fra una e l'altra."""
+        """Set the test phase, palette, and inter-phase needle transition."""
         if phase not in self.PHASES or phase == self._phase:
             return
         previous, self._phase = self._phase, phase
@@ -223,40 +200,37 @@ class SpeedGauge(Gtk.DrawingArea):
             self.props.value = 0.0
         elif phase in ("download", "upload"):
             if previous in ("download", "upload") and self._value > 0.5:
-                # Si passa da una misura all'altra: l'ago torna a zero più
-                # lentamente prima di inseguire la fase nuova. Il colore resta
-                # quello della fase appena conclusa finché l'arco non si richiude.
+                # Return to zero before following the next transfer phase, while
+                # retaining the previous color until the arc closes.
                 self._settling = True
                 self._animate_to(0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC)
             else:
                 self._color_phase = phase
         elif phase == "done" and self._value > 0.5:
-            # Test finito: lo strumento torna a riposo, con l'arco che si
-            # richiude nel colore dell'ultima misura.
+            # Close the arc in the last transfer color after completion.
             self._target = 0.0
             self._settling = True
             self._animate_to(0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC)
 
-        # Non è un cambio di valore ma di stato: colori ed etichette cambiano.
         self.queue_draw()
 
     def reset(self):
-        """Riporta l'ago a zero e torna alla fase iniziale."""
-        self._phase = "ping"  # forza il passaggio di stato in set_phase()
+        """Return the needle and phase to their initial state."""
+        self._phase = "ping"
         self.set_phase("idle")
 
     def _animate_to(self, target_value, duration_ms, easing):
         animation = self._animation
-        animation.set_value_from(self._value)  # riparte da dove si trova l'ago
+        animation.set_value_from(self._value)
         animation.set_value_to(target_value)
         animation.set_duration(duration_ms)
         animation.set_easing(easing)
-        animation.reset()  # niente salti: reset() rimette il valore su value_from
+        animation.reset()
         animation.play()
 
     def _on_animation_done(self, _animation):
         if not self._settling or self._value > 0.5:
-            return  # non è la fine del ritorno a zero
+            return
         self._settling = False
         if self._phase in ("download", "upload"):
             self._color_phase = self._phase
@@ -281,22 +255,18 @@ class SpeedGauge(Gtk.DrawingArea):
             self._scale_animation.reset()
             self._scale_animation.play()
 
-    # ------------------------------------------------------------------
-    # Scala logaritmica
-    # ------------------------------------------------------------------
     def _fraction_for_scale(self, speed, scale_index):
-        """Posizione 0→1 lungo l'arco.
+        """Return a logarithmic 0–1 position along one scale.
 
-        log10(1 + v) / log10(1 + fondoscala): con la scala lineare tutto ciò che
-        sta sotto i 100 Mbps si schiaccerebbe nel primo decimo dell'arco e l'ago
-        sembrerebbe fermo. Il +1 tiene lo zero esattamente a inizio scala.
+        A linear scale compresses sub-100 Mbps values near the start. Adding one
+        keeps zero at the origin while preserving useful low-speed movement.
         """
         top = GAUGE_SCALES[scale_index][0]
         speed = min(max(speed, 0.0), top)
         return math.log10(1.0 + speed) / math.log10(1.0 + top)
 
     def _fraction(self, speed):
-        """Posizione corrente, interpolata mentre il fondoscala si espande."""
+        """Interpolate the current position while the scale expands."""
         if self._scale_from_index is None:
             return self._fraction_for_scale(speed, self._scale_index)
         before = self._fraction_for_scale(speed, self._scale_from_index)
@@ -306,9 +276,6 @@ class SpeedGauge(Gtk.DrawingArea):
     def _angle(self, fraction):
         return math.radians(GAUGE_START_DEG + GAUGE_SWEEP_DEG * fraction)
 
-    # ------------------------------------------------------------------
-    # Disegno
-    # ------------------------------------------------------------------
     def _draw(self, _area, cr, width, height):
         size = min(width, height)
         if size <= 1:
@@ -348,13 +315,10 @@ class SpeedGauge(Gtk.DrawingArea):
         self._draw_readout(cr, cx, cy, size, base, stops)
 
     def _draw_vignette(self, cr, cx, cy, radius, base):
-        """Profondità del quadrante, interamente disegnata dal backend Cairo.
+        """Draw subtle dial depth with a radial gradient.
 
-        Le fermate seguono una curva più ripida verso il bordo: centro ed
-        estremità restano rispettivamente a 0 e 0,035 alpha, ma le poche fasce
-        di grigio più visibili diventano più sottili. A differenza del dithering
-        raster, non c'è alcun lavoro Python proporzionale ai pixel durante un
-        ridimensionamento o l'animazione del layout.
+        The curve becomes steeper near the edge to minimize visible gray bands
+        without per-pixel Python work during resize or layout animation.
         """
         gradient = cairo.RadialGradient(cx, cy, radius * 0.15, cx, cy, radius)
         for position, alpha in (
@@ -372,11 +336,10 @@ class SpeedGauge(Gtk.DrawingArea):
         self._draw_vignette_dither(cr, cx, cy, radius, base)
 
     def _draw_vignette_dither(self, cr, cx, cy, radius, base):
-        """Dither a un solo livello, ripetuto: elimina le bande senza rallentare.
+        """Mask a small repeating dither texture over the vignette.
 
-        La texture misura appena 64×64 px ed è costruita una sola volta per
-        tema. Cairo la ripete e la maschera in C, quindi il resize non fa più
-        lavoro proporzionale all'area del tachimetro.
+        The texture is cached per theme color; Cairo repeats and masks it without
+        resize work proportional to the gauge area.
         """
         base_key = tuple(round(component, 4) for component in base)
         if base_key != self._vignette_dither_key:
@@ -398,7 +361,7 @@ class SpeedGauge(Gtk.DrawingArea):
         cr.restore()
 
     def _make_vignette_dither_surface(self, base):
-        """Piccola texture di rumore stabile, con un solo livello alpha."""
+        """Create a stable single-alpha noise texture."""
         size = self.VIGNETTE_DITHER_SIZE
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
         words = memoryview(surface.get_data()).cast("I")
@@ -407,8 +370,7 @@ class SpeedGauge(Gtk.DrawingArea):
 
         for y in range(size):
             for x in range(size):
-                # Distribuzione pseudocasuale fissa: metà dei pixel illumina
-                # appena il livello adiacente, metà resta trasparente.
+                # A stable hash lights roughly half the pixels.
                 noise_word = (
                     (x * 0x1F123BB5) ^ (y * 0x5F356495) ^ ((x + y) * 0x27D4EB2D)
                 )
@@ -423,16 +385,15 @@ class SpeedGauge(Gtk.DrawingArea):
         return surface
 
     def _draw_track(self, cr, cx, cy, radius, base):
-        """Traccia dell'arco: colore del testo con alpha bassa."""
+        """Draw the inactive arc using a low-alpha text color."""
         cr.set_source_rgba(*base, 0.13)
         cr.arc(cx, cy, radius, self._angle(0.0), self._angle(1.0))
         cr.stroke()
 
     def _draw_fill(self, cr, cx, cy, radius, stops):
-        """Arco colorato da inizio scala fino al valore corrente.
+        """Draw the colored arc up to the current value.
 
-        Disegnato a segmenti: è il modo più semplice per far seguire la
-        sfumatura all'arco invece che a una direzione fissa.
+        Short segments make the gradient follow the arc instead of a fixed axis.
         """
         fraction = self._fraction(self._value)
         if fraction <= 0.0:
@@ -442,7 +403,7 @@ class SpeedGauge(Gtk.DrawingArea):
             start = fraction * index / segments
             end = fraction * (index + 1) / segments
             cr.set_source_rgb(*rgb_at(stops, (start + end) / 2.0))
-            # micro-sovrapposizione: evita le righine chiare fra un segmento e l'altro
+            # Slight overlap prevents seams between adjacent segments.
             cr.arc(cx, cy, radius, self._angle(start) - 0.004, self._angle(end) + 0.004)
             cr.stroke()
 
@@ -453,9 +414,7 @@ class SpeedGauge(Gtk.DrawingArea):
                 self._draw_tick(cr, cx, cy, size, base, tick, self._scale_index, geometry)
             return
 
-        # Le tacche condivise scorrono lungo l'arco. Quelle solo della vecchia
-        # scala svaniscono, le nuove compaiono gradualmente: niente salti quando
-        # si passa dal fondoscala 1G a quello 10G.
+        # Shared ticks move along the arc; removed and added ticks cross-fade.
         before_index = self._scale_from_index
         before_ticks = set(GAUGE_SCALES[before_index][1])
         after_ticks = set(GAUGE_SCALES[self._scale_index][1])
@@ -518,7 +477,7 @@ class SpeedGauge(Gtk.DrawingArea):
         )
 
     def _tick_offset(self, tick, size, scale_index=None):
-        """Ritocchi ottici delle etichette, esposti nelle due tabelle sopra."""
+        """Return the optical label adjustment for a tick."""
         if scale_index is None:
             scale_index = self._scale_index
         if GAUGE_SCALES[scale_index][0] <= 1000.0:
@@ -529,7 +488,7 @@ class SpeedGauge(Gtk.DrawingArea):
         return horizontal * letter_width, vertical * letter_width
 
     def _tick_label(self, tick, scale_index=None):
-        """Etichetta breve per le velocità multi-gigabit della scala estesa."""
+        """Use compact labels for multi-gigabit values."""
         if scale_index is None:
             scale_index = self._scale_index
         if GAUGE_SCALES[scale_index][0] > 1000.0 and tick in (1000, 2500, 5000, 10000):
@@ -551,7 +510,7 @@ class SpeedGauge(Gtk.DrawingArea):
         cr.line_to(-tail, 0.0)
         cr.line_to(0.0, half)
         cr.close_path()
-        # Sfumatura lungo l'ago: coda smorzata, punta piena.
+        # Fade from a dim tail to an opaque tip.
         needle = cairo.LinearGradient(-tail, 0.0, tip, 0.0)
         needle.add_color_stop_rgba(0.0, *base, 0.30)
         needle.add_color_stop_rgba(1.0, *base, 0.90)
@@ -567,7 +526,7 @@ class SpeedGauge(Gtk.DrawingArea):
         cr.fill()
 
     def _draw_readout(self, cr, cx, cy, size, base, stops):
-        """Numero grande e unità, sotto l'ago."""
+        """Draw the large numeric readout and unit below the needle."""
         draw_text(
             self,
             cr,
@@ -593,7 +552,7 @@ class SpeedGauge(Gtk.DrawingArea):
         PangoCairo.show_layout(cr, unit_layout)
 
     def _draw_readout_marker(self, cr, cx, cy, size, stops):
-        """Freccia colorata che indica a quale misura appartiene il valore live."""
+        """Draw the colored marker identifying the active transfer direction."""
         marker_size = size * 0.044
         radius = marker_size * 0.42
         color = rgb_at(stops, 0.55)
@@ -615,4 +574,3 @@ class SpeedGauge(Gtk.DrawingArea):
         cr.line_to(cx + head, cy + (stem - head) * direction)
         cr.stroke()
         cr.restore()
-
