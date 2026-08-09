@@ -36,7 +36,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noq
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
-APP_VERSION = "1.8"
+APP_VERSION = "1.9"
 
 BIN = "speedtest"
 # Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
@@ -53,6 +53,9 @@ PROGRESS_HIDE_DELAY_MS = 600
 # Espansioni della pagina: abbastanza lente da rendere fluido il ridimensionamento
 # del tachimetro e delle righe sottostanti.
 LAYOUT_TRANSITION_DURATION_MS = 600
+# I pulsanti che accompagnano il risultato devono comparire rapidamente, senza
+# rubare attenzione alla chiusura del test.
+RESULT_ACTION_TRANSITION_DURATION_MS = 330
 # Secondi di grazia fra SIGTERM e SIGKILL quando si annulla un test.
 KILL_GRACE_SECONDS = 3
 
@@ -1713,10 +1716,12 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._latencies = {"idle": None, "download": None, "upload": None}
         self._jitter = None
         self._loss = None
+        self._result_url = None
         self._auto_server = True  # il test in corso usa la scelta automatica?
         self._updating_servers = False  # ricostruzione dell'elenco in corso
         self._has_run = False  # almeno un test concluso in questa finestra
         self._progress_hide_source = None  # timer della barra al termine del test
+        self._result_action_reveal_source = None
 
         self._toasts = Adw.ToastOverlay()
         self.set_content(self._toasts)
@@ -1852,13 +1857,41 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._measures.add_named(self._build_classic_view(), "classic")
         box.append(self._measures)
 
-        # --- Avvio / annullamento ---
+        # --- Avvio / annullamento e azioni sul risultato ---
+        # I Revealer laterali sono collassati all'avvio: non lasciano alcuno
+        # spazio vuoto finché non esiste un risultato da gestire.
+        test_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        test_actions.set_halign(Gtk.Align.CENTER)
+        test_actions.set_valign(Gtk.Align.CENTER)
+
+        self._clear_result_button = Gtk.Button(
+            icon_name="go-home-symbolic", tooltip_text=_("Clear test")
+        )
+        self._clear_result_button.set_size_request(42, 42)
+        self._clear_result_button.set_sensitive(False)
+        self._clear_result_button.add_css_class("circular")
+        self._clear_result_button.add_css_class("suggested-action")
+        self._clear_result_button.connect("clicked", self._on_clear_result_clicked)
+        self._clear_result_revealer = self._result_action_revealer(self._clear_result_button)
+        test_actions.append(self._clear_result_revealer)
+
         self._start_button = Gtk.Button(label=_("Start test"))
         self._start_button.add_css_class("suggested-action")
         self._start_button.add_css_class("pill")
-        self._start_button.set_halign(Gtk.Align.CENTER)
         self._start_button.connect("clicked", self._on_start_clicked)
-        box.append(self._start_button)
+        test_actions.append(self._start_button)
+
+        self._online_result_button = Gtk.Button(
+            icon_name="external-link-symbolic", tooltip_text=_("View this result online")
+        )
+        self._online_result_button.set_size_request(42, 42)
+        self._online_result_button.set_sensitive(False)
+        self._online_result_button.add_css_class("circular")
+        self._online_result_button.add_css_class("suggested-action")
+        self._online_result_button.connect("clicked", self._on_view_result_online_clicked)
+        self._online_result_revealer = self._result_action_revealer(self._online_result_button)
+        test_actions.append(self._online_result_revealer)
+        box.append(test_actions)
 
         # --- Dettagli del risultato: nascosti finché non c'è un test ---
         # Il Revealer fa crescere l'area gradualmente quando arriva il primo
@@ -1875,15 +1908,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._server_detail_row.add_prefix(DetailIcon("server"))
         self._details_group.add(self._server_detail_row)
 
-        self._result_row = Adw.ActionRow(title=_("Online result"))
-        self._result_link = Gtk.LinkButton.new_with_label("https://www.speedtest.net/", _("Open"))
-        self._result_link.set_valign(Gtk.Align.CENTER)
-        self._result_row.add_suffix(self._result_link)
-        self._result_revealer = Gtk.Revealer()
-        self._result_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
-        self._result_revealer.set_transition_duration(LAYOUT_TRANSITION_DURATION_MS)
-        self._result_revealer.set_child(self._result_row)
-        self._details_group.add(self._result_revealer)
         self._details_revealer = Gtk.Revealer()
         self._details_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
         self._details_revealer.set_transition_duration(LAYOUT_TRANSITION_DURATION_MS)
@@ -1919,6 +1943,15 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         column.append(scroller)
         column.append(self._progress)
         return column
+
+    @staticmethod
+    def _result_action_revealer(button):
+        """Contenitore collassabile con l'animazione nativa dell'azione."""
+        revealer = Gtk.Revealer()
+        revealer.set_transition_type(Gtk.RevealerTransitionType.SWING_DOWN)
+        revealer.set_transition_duration(RESULT_ACTION_TRANSITION_DURATION_MS)
+        revealer.set_child(button)
+        return revealer
 
     def _build_server_factory(self):
         """Voci del menu a due righe: nome del server sopra, località sotto."""
@@ -2829,6 +2862,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._latencies = {"idle": None, "download": None, "upload": None}
         self._jitter = None
         self._loss = None
+        self._result_url = None
         self._progress.set_fraction(0.0)
         self._set_phase("idle", _("Starting…"))
         for label in (
@@ -2855,9 +2889,64 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._upload_icon.set_active(False)
         # I dettagli tornano nascosti: si ripopolano al primo evento del test.
         self._details_revealer.set_reveal_child(False)
-        self._result_revealer.set_reveal_child(False)
+        self._set_result_actions_visible(False)
         self._server_detail_row.set_subtitle(PLACEHOLDER)
         self._isp_row.set_subtitle(PLACEHOLDER)
+
+    def _set_result_actions_visible(self, visible):
+        """Mostra prima l'azione di reset e poi, se presente, quella online."""
+        self._cancel_result_action_delay()
+        if not visible:
+            self._set_result_action_visible(
+                self._clear_result_revealer, self._clear_result_button, False
+            )
+            self._set_result_action_visible(
+                self._online_result_revealer, self._online_result_button, False
+            )
+            return
+
+        self._set_result_action_visible(
+            self._clear_result_revealer, self._clear_result_button, True
+        )
+        self._set_result_action_visible(
+            self._online_result_revealer, self._online_result_button, False
+        )
+        if self._result_url:
+            self._result_action_reveal_source = GLib.timeout_add(
+                RESULT_ACTION_TRANSITION_DURATION_MS, self._reveal_online_result_action
+            )
+
+    def _cancel_result_action_delay(self):
+        if self._result_action_reveal_source is not None:
+            GLib.source_remove(self._result_action_reveal_source)
+            self._result_action_reveal_source = None
+
+    def _reveal_online_result_action(self):
+        self._result_action_reveal_source = None
+        if self._run is None and self._has_run and self._result_url:
+            self._set_result_action_visible(
+                self._online_result_revealer, self._online_result_button, True
+            )
+        return GLib.SOURCE_REMOVE
+
+    @staticmethod
+    def _set_result_action_visible(revealer, button, visible):
+        """Accoppia il collasso del layout a un pulsante realmente attivo."""
+        button.set_sensitive(visible)
+        revealer.set_reveal_child(visible)
+
+    def _on_clear_result_clicked(self, _button):
+        """Torna allo stato iniziale e richiude i dettagli del test appena visto."""
+        if self._run is not None:
+            return
+        self._has_run = False
+        self._reset_results()
+        self._set_phase("idle", _("Ready"))
+        self._set_running(False)
+
+    def _on_view_result_online_clicked(self, _button):
+        if self._result_url:
+            Gtk.show_uri(self, self._result_url, 0)
 
     # ------------------------------------------------------------------
     # Aggiornamento delle due viste
@@ -3046,11 +3135,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._set_server_details(event.get("server"), event.get("isp"))
 
         url = event.get("result", {}).get("url")
-        if url:
-            self._result_link.set_uri(url)
-            self._result_link.set_label(url.rsplit("/", 1)[-1] or _("Open"))
-            self._result_link.set_tooltip_text(url)
-            self._result_revealer.set_reveal_child(True)
+        self._result_url = url if isinstance(url, str) and url else None
 
         self._progress.set_fraction(1.0)
         self._commit_header("download")
@@ -3134,6 +3219,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         # Uscita pulita. Nota: stderr NON vuoto non è di per sé un errore — alla
         # prima esecuzione la CLI ci scrive l'informativa GDPR anche quando il
         # test riesce, quindi lo segnaliamo solo con exit code diverso da zero.
+        self._set_result_actions_visible(True)
 
     def _toast(self, message, detail=None):
         """Toast breve; se c'è un testo lungo va nel dialogo dei dettagli."""

@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SpeedGTK 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-09 11:21+0200\n"
+"POT-Creation-Date: 2026-08-09 12:22+0200\n"
 "PO-Revision-Date: 2026-08-08 12:00+0000\n"
 "Last-Translator: SpeedGTK contributors\n"
 "Language-Team: Russian\n"
@@ -16,67 +16,67 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<12 || n%100>14) ? 1 : 2);\n"
 
-#: speedgtk.py:98
+#: speedgtk.py:101
 msgid "Sort by date (default)"
 msgstr "Сортировать по дате (по умолчанию)"
 
-#: speedgtk.py:99
+#: speedgtk.py:102
 msgid "Best download"
 msgstr "Лучшая загрузка"
 
-#: speedgtk.py:100
+#: speedgtk.py:103
 msgid "Best upload"
 msgstr "Лучшая отдача"
 
-#: speedgtk.py:101
+#: speedgtk.py:104
 msgid "Best ping"
 msgstr "Лучший пинг"
 
-#: speedgtk.py:102
+#: speedgtk.py:105
 msgid "Best overall"
 msgstr "Лучший общий результат"
 
-#: speedgtk.py:106 speedgtk.py:246
+#: speedgtk.py:109 speedgtk.py:249
 msgid "Same as the system"
 msgstr "Как в системе"
 
-#: speedgtk.py:107
+#: speedgtk.py:110
 msgid "Light"
 msgstr "Светлая"
 
-#: speedgtk.py:108
+#: speedgtk.py:111
 msgid "Dark"
 msgstr "Тёмная"
 
-#: speedgtk.py:247
+#: speedgtk.py:250
 msgid "Italian"
 msgstr "Итальянский"
 
-#: speedgtk.py:248
+#: speedgtk.py:251
 msgid "English"
 msgstr "Английский"
 
-#: speedgtk.py:249
+#: speedgtk.py:252
 msgid "German"
 msgstr "Немецкий"
 
-#: speedgtk.py:250
+#: speedgtk.py:253
 msgid "French"
 msgstr "Французский"
 
-#: speedgtk.py:251
+#: speedgtk.py:254
 msgid "Spanish"
 msgstr "Испанский"
 
-#: speedgtk.py:252
+#: speedgtk.py:255
 msgid "Russian"
 msgstr "Русский"
 
-#: speedgtk.py:262
+#: speedgtk.py:265
 msgid "Too many tests in a short time"
 msgstr "Слишком много тестов за короткое время"
 
-#: speedgtk.py:264
+#: speedgtk.py:267
 msgid ""
 "Ookla is temporarily limiting this connection because too many tests were "
 "run in a short time. Wait a few minutes before repeating it."
@@ -84,11 +84,11 @@ msgstr ""
 "Ookla временно ограничивает это подключение, потому что за короткое время "
 "было запущено слишком много тестов. Подождите несколько минут."
 
-#: speedgtk.py:270
+#: speedgtk.py:273
 msgid "No test server available"
 msgstr "Нет доступных тестовых серверов"
 
-#: speedgtk.py:272
+#: speedgtk.py:275
 msgid ""
 "Ookla returned no usable server. Refresh the list, or pick a different "
 "server, and try again."
@@ -96,11 +96,11 @@ msgstr ""
 "Ookla не вернула ни одного пригодного сервера. Обновите список или выберите "
 "другой сервер и попробуйте снова."
 
-#: speedgtk.py:278
+#: speedgtk.py:281
 msgid "Cannot reach Ookla's servers"
 msgstr "Серверы Ookla недоступны"
 
-#: speedgtk.py:280
+#: speedgtk.py:283
 msgid ""
 "The configuration service could not be reached. Check that the connection is "
 "working and that no proxy or firewall is blocking it."
@@ -108,20 +108,20 @@ msgstr ""
 "Не удалось связаться со службой конфигурации. Проверьте, работает ли "
 "подключение и не блокирует ли его прокси или брандмауэр."
 
-#: speedgtk.py:286 speedgtk.py:291
+#: speedgtk.py:289 speedgtk.py:294
 msgid "Name resolution failed"
 msgstr "Не удалось разрешить имя"
 
-#: speedgtk.py:287 speedgtk.py:292
+#: speedgtk.py:290 speedgtk.py:295
 msgid ""
 "The server name could not be resolved: this usually points at a DNS problem."
 msgstr "Имя сервера не удалось разрешить: обычно это проблема DNS."
 
-#: speedgtk.py:296
+#: speedgtk.py:299
 msgid "The connection timed out"
 msgstr "Время ожидания подключения истекло"
 
-#: speedgtk.py:297
+#: speedgtk.py:300
 msgid ""
 "The test server did not answer in time. It may be overloaded: try another "
 "one."
@@ -129,83 +129,83 @@ msgstr ""
 "Тестовый сервер не ответил вовремя. Возможно, он перегружен: попробуйте "
 "другой."
 
-#: speedgtk.py:301 speedgtk.py:306 speedgtk.py:311
+#: speedgtk.py:304 speedgtk.py:309 speedgtk.py:314
 msgid "Cannot connect to the test server"
 msgstr "Не удалось подключиться к тестовому серверу"
 
-#: speedgtk.py:302 speedgtk.py:307 speedgtk.py:312
+#: speedgtk.py:305 speedgtk.py:310 speedgtk.py:315
 msgid ""
 "The connection to the chosen server could not be opened. Try another server."
 msgstr ""
 "Не удалось открыть подключение к выбранному серверу. Попробуйте другой "
 "сервер."
 
-#: speedgtk.py:316
+#: speedgtk.py:319
 msgid "Request refused by the server"
 msgstr "Сервер отклонил запрос"
 
-#: speedgtk.py:317
+#: speedgtk.py:320
 msgid "The test server refused the request. Try a different server."
 msgstr "Тестовый сервер отклонил запрос. Попробуйте другой сервер."
 
-#: speedgtk.py:321
+#: speedgtk.py:324
 msgid "Test interrupted"
 msgstr "Тест прерван"
 
-#: speedgtk.py:322
+#: speedgtk.py:325
 msgid "The test ended early. Check that the connection stayed up."
 msgstr ""
 "Тест завершился раньше времени. Проверьте, не пропадало ли подключение."
 
-#: speedgtk.py:335
+#: speedgtk.py:338
 msgid "speedtest reported an unspecified error"
 msgstr "speedtest сообщил о неуточнённой ошибке"
 
-#: speedgtk.py:530
+#: speedgtk.py:533
 msgid "%d/%m/%Y %H:%M"
 msgstr "%d.%m.%Y %H:%M"
 
-#: speedgtk.py:537 speedgtk.py:538
+#: speedgtk.py:540 speedgtk.py:541
 msgid "Speedtest CLI"
 msgstr "Speedtest CLI"
 
-#: speedgtk.py:1292 speedgtk.py:2008 speedgtk.py:2461 speedgtk.py:2889
+#: speedgtk.py:1295 speedgtk.py:2041 speedgtk.py:2494 speedgtk.py:2978
 msgid "Mbps"
 msgstr "Мбит/с"
 
-#: speedgtk.py:1729 speedgtk.py:2665
+#: speedgtk.py:1734 speedgtk.py:2698
 msgid "Refresh the server list"
 msgstr "Обновить список серверов"
 
-#: speedgtk.py:1736
+#: speedgtk.py:1741
 msgid "History…"
 msgstr "История…"
 
-#: speedgtk.py:1737
+#: speedgtk.py:1742
 msgid "Preferences…"
 msgstr "Параметры…"
 
-#: speedgtk.py:1738
+#: speedgtk.py:1743
 msgid "About"
 msgstr "О приложении"
 
-#: speedgtk.py:1740
+#: speedgtk.py:1745
 msgid "Menu"
 msgstr "Меню"
 
-#: speedgtk.py:1780
+#: speedgtk.py:1785
 msgid "Checking speedtest…"
 msgstr "Проверка speedtest…"
 
-#: speedgtk.py:1781
+#: speedgtk.py:1786
 msgid "Looking for the official Ookla CLI."
 msgstr "Поиск официальной CLI от Ookla."
 
-#: speedgtk.py:1786
+#: speedgtk.py:1791
 msgid "Use of the Ookla Speedtest CLI"
 msgstr "Использование CLI Speedtest от Ookla"
 
-#: speedgtk.py:1797
+#: speedgtk.py:1802
 msgid ""
 "SpeedGTK uses Ookla's official Speedtest CLI. Before continuing, please read "
 "and accept Ookla's End User License Agreement, Terms of Use and Privacy "
@@ -215,250 +215,254 @@ msgstr ""
 "прочитайте и примите лицензионное соглашение с конечным пользователем, "
 "условия использования и политику конфиденциальности Ookla."
 
-#: speedgtk.py:1808
+#: speedgtk.py:1813
 msgid "End User License Agreement"
 msgstr "Лицензионное соглашение с конечным пользователем"
 
-#: speedgtk.py:1809
+#: speedgtk.py:1814
 msgid "Terms of Use"
 msgstr "Условия использования"
 
-#: speedgtk.py:1810
+#: speedgtk.py:1815
 msgid "Privacy Policy"
 msgstr "Политика конфиденциальности"
 
-#: speedgtk.py:1819
+#: speedgtk.py:1824
 msgid "Quit"
 msgstr "Выйти"
 
-#: speedgtk.py:1820
+#: speedgtk.py:1825
 msgid "Accept and continue"
 msgstr "Принять и продолжить"
 
-#: speedgtk.py:1856 speedgtk.py:2819
+#: speedgtk.py:1868
+msgid "Clear test"
+msgstr "Сбросить тест"
+
+#: speedgtk.py:1878 speedgtk.py:2852
 msgid "Start test"
 msgstr "Начать тест"
 
-#: speedgtk.py:1868
+#: speedgtk.py:1885
+msgid "View this result online"
+msgstr "Просмотреть этот результат в интернете"
+
+#: speedgtk.py:1901
 msgid "ISP"
 msgstr "Провайдер"
 
-#: speedgtk.py:1873
+#: speedgtk.py:1906
 msgid "Server used"
 msgstr "Использованный сервер"
 
-#: speedgtk.py:1878
-msgid "Online result"
-msgstr "Результат в сети"
-
-#: speedgtk.py:1879 speedgtk.py:2347 speedgtk.py:3051
-msgid "Open"
-msgstr "Открыть"
-
-#: speedgtk.py:1896
+#: speedgtk.py:1920
 msgid "Server"
 msgstr "Сервер"
 
-#: speedgtk.py:1905
+#: speedgtk.py:1929
 msgid "Manual server ID"
 msgstr "ID сервера вручную"
 
-#: speedgtk.py:1955
+#: speedgtk.py:1988
 msgid "DOWNLOAD"
 msgstr "СКАЧИВАНИЕ"
 
-#: speedgtk.py:1958
+#: speedgtk.py:1991
 msgid "UPLOAD"
 msgstr "ОТПРАВКА"
 
-#: speedgtk.py:1968
+#: speedgtk.py:2001
 msgid "Ping ms"
 msgstr "Пинг мс"
 
-#: speedgtk.py:1973 speedgtk.py:2060
+#: speedgtk.py:2006 speedgtk.py:2093
 msgid "Idle ping"
 msgstr "Пинг без нагрузки"
 
-#: speedgtk.py:1976 speedgtk.py:2061
+#: speedgtk.py:2009 speedgtk.py:2094
 msgid "Download ping"
 msgstr "Пинг при загрузке"
 
-#: speedgtk.py:1979 speedgtk.py:2062
+#: speedgtk.py:2012 speedgtk.py:2095
 msgid "Upload ping"
 msgstr "Пинг при отдаче"
 
-#: speedgtk.py:1986
+#: speedgtk.py:2019
 msgid "Jitter ms"
 msgstr "Джиттер мс"
 
-#: speedgtk.py:1987
+#: speedgtk.py:2020
 msgid "Loss %"
 msgstr "Потери %"
 
-#: speedgtk.py:1995 speedgtk.py:2056
+#: speedgtk.py:2028 speedgtk.py:2089 speedgtk.py:2944
 msgid "Ready"
 msgstr "Готово"
 
-#: speedgtk.py:2055
+#: speedgtk.py:2088
 msgid "Status"
 msgstr "Состояние"
 
-#: speedgtk.py:2056
+#: speedgtk.py:2089
 msgid "Phase"
 msgstr "Этап"
 
-#: speedgtk.py:2059 speedgtk.py:2158
+#: speedgtk.py:2092 speedgtk.py:2191
 msgid "Measurements"
 msgstr "Измерения"
 
-#: speedgtk.py:2063
+#: speedgtk.py:2096
 msgid "Jitter"
 msgstr "Джиттер"
 
-#: speedgtk.py:2064
+#: speedgtk.py:2097
 msgid "Download"
 msgstr "Скачивание"
 
-#: speedgtk.py:2065
+#: speedgtk.py:2098
 msgid "Upload"
 msgstr "Отправка"
 
-#: speedgtk.py:2066
+#: speedgtk.py:2099
 msgid "Packet loss"
 msgstr "Потери пакетов"
 
-#: speedgtk.py:2138
+#: speedgtk.py:2171
 msgid "Preferences"
 msgstr "Параметры"
 
-#: speedgtk.py:2139
+#: speedgtk.py:2172
 msgid "General"
 msgstr "Общие"
 
-#: speedgtk.py:2141
+#: speedgtk.py:2174
 msgid "Appearance"
 msgstr "Внешний вид"
 
-#: speedgtk.py:2144
+#: speedgtk.py:2177
 msgid "Classic interface"
 msgstr "Классический интерфейс"
 
-#: speedgtk.py:2144
+#: speedgtk.py:2177
 msgid "Text labels only, no gauge"
 msgstr "Только текстовые значения, без спидометра"
 
-#: speedgtk.py:2149
+#: speedgtk.py:2182
 msgid "System accent colors"
 msgstr "Акцентные цвета системы"
 
-#: speedgtk.py:2150
+#: speedgtk.py:2183
 msgid "Instead of Ookla's teal and violet"
 msgstr "Вместо бирюзового и фиолетового Ookla"
 
-#: speedgtk.py:2162
+#: speedgtk.py:2195
 msgid "Automatic scale"
 msgstr "Автоматическая шкала"
 
-#: speedgtk.py:2163
+#: speedgtk.py:2196
 msgid "Extends the gauge full scale beyond 1000 Mbps"
 msgstr "Расширяет предел шкалы спидометра выше 1000 Мбит/с"
 
-#: speedgtk.py:2170 speedgtk.py:2283
+#: speedgtk.py:2203 speedgtk.py:2316
 msgid "History"
 msgstr "История"
 
-#: speedgtk.py:2170
+#: speedgtk.py:2203
 #, python-brace-format
 msgid "Saved in {path}"
 msgstr "Сохраняется в {path}"
 
-#: speedgtk.py:2174
-msgid "Every completed test is added to the history"
-msgstr "Каждый завершённый тест добавляется в историю"
-
-#: speedgtk.py:2174
+#: speedgtk.py:2207
 msgid "Save results"
 msgstr "Сохранять результаты"
 
-#: speedgtk.py:2178
+#: speedgtk.py:2207
+msgid "Every completed test is added to the history"
+msgstr "Каждый завершённый тест добавляется в историю"
+
+#: speedgtk.py:2211
 msgid "Open the history"
 msgstr "Открыть историю"
 
-#: speedgtk.py:2179
+#: speedgtk.py:2212
 #, python-brace-format
 msgid "Saved tests: {count}"
 msgstr "Сохранённых тестов: {count}"
 
-#: speedgtk.py:2198
+#: speedgtk.py:2231
 msgid "Decimal places"
 msgstr "Знаков после запятой"
 
-#: speedgtk.py:2199
+#: speedgtk.py:2232
 msgid "Download, upload and ping"
 msgstr "Скачивание, отдача и пинг"
 
-#: speedgtk.py:2227
+#: speedgtk.py:2260
 msgid "Language"
 msgstr "Язык"
 
-#: speedgtk.py:2229
+#: speedgtk.py:2262
 #, python-brace-format
 msgid "Active: {language}"
 msgstr "Активен: {language}"
 
-#: speedgtk.py:2238
+#: speedgtk.py:2271
 msgid "The language will be applied at the next launch"
 msgstr "Язык будет применён при следующем запуске"
 
-#: speedgtk.py:2252
+#: speedgtk.py:2285
 msgid "Theme"
 msgstr "Тема"
 
-#: speedgtk.py:2274
+#: speedgtk.py:2307
 msgid "A GTK 4 interface for the official Ookla Speedtest CLI."
 msgstr "Интерфейс GTK 4 для официальной CLI Speedtest от Ookla."
 
-#: speedgtk.py:2286
+#: speedgtk.py:2319
 msgid "Sort history"
 msgstr "Сортировать историю"
 
-#: speedgtk.py:2295
+#: speedgtk.py:2328
 msgid "Clear the history"
 msgstr "Очистить историю"
 
-#: speedgtk.py:2332
+#: speedgtk.py:2365
 msgid "No saved test"
 msgstr "Нет сохранённых тестов"
 
-#: speedgtk.py:2333
+#: speedgtk.py:2366
 msgid "Completed tests show up here, if the history is enabled."
 msgstr "Завершённые тесты появляются здесь, если история включена."
 
-#: speedgtk.py:2337
+#: speedgtk.py:2370
 #, python-brace-format
 msgid "Saved tests: {count} — at most {limit}"
 msgstr "Сохранённых тестов: {count} — не более {limit}"
 
-#: speedgtk.py:2469
+#: speedgtk.py:2380
+msgid "Open"
+msgstr "Открыть"
+
+#: speedgtk.py:2502
 #, python-brace-format
 msgid "Server: {server}"
 msgstr "Сервер: {server}"
 
-#: speedgtk.py:2471
+#: speedgtk.py:2504
 #, python-brace-format
 msgid "ISP: {isp}"
 msgstr "Провайдер: {isp}"
 
-#: speedgtk.py:2473
+#: speedgtk.py:2506
 #, python-brace-format
 msgid "Jitter {jitter} ms · loss {loss} %"
 msgstr "Джиттер {jitter} мс · потери {loss} %"
 
-#: speedgtk.py:2482
+#: speedgtk.py:2515
 msgid "Clear the history?"
 msgstr "Очистить историю?"
 
-#: speedgtk.py:2484
+#: speedgtk.py:2517
 msgid ""
 "The results saved on this computer will be deleted. The tests stay available "
 "at their speedtest.net links."
@@ -466,19 +470,19 @@ msgstr ""
 "Результаты, сохранённые на этом компьютере, будут удалены. Сами тесты "
 "останутся доступны по своим ссылкам на speedtest.net."
 
-#: speedgtk.py:2488 speedgtk.py:2815
+#: speedgtk.py:2521 speedgtk.py:2848
 msgid "Cancel"
 msgstr "Отмена"
 
-#: speedgtk.py:2489
+#: speedgtk.py:2522
 msgid "Clear"
 msgstr "Очистить"
 
-#: speedgtk.py:2558
+#: speedgtk.py:2591
 msgid "The `speedtest` found is not the official one"
 msgstr "Найденный `speedtest` — не официальный"
 
-#: speedgtk.py:2560
+#: speedgtk.py:2593
 msgid ""
 "The <tt>speedtest</tt> command on this system is not Ookla's official CLI, "
 "but almost certainly the old Python script <tt>speedtest-cli</tt>.\n"
@@ -501,11 +505,11 @@ msgstr ""
 "В дистрибутивах на базе Debian удалите старую версию и установите "
 "официальную с помощью:"
 
-#: speedgtk.py:2571
+#: speedgtk.py:2604
 msgid "Ookla's `speedtest` CLI was not found"
 msgstr "CLI `speedtest` от Ookla не найдена"
 
-#: speedgtk.py:2573
+#: speedgtk.py:2606
 msgid ""
 "This app is a frontend for Ookla's <b>official</b> CLI, which is not "
 "installed.\n"
@@ -524,123 +528,123 @@ msgstr ""
 "\n"
 "В дистрибутивах на базе Debian официальную версию можно установить с помощью:"
 
-#: speedgtk.py:2599
+#: speedgtk.py:2632
 msgid "Installation instructions for other distributions"
 msgstr "Инструкции по установке для других дистрибутивов"
 
-#: speedgtk.py:2606
+#: speedgtk.py:2639
 #, python-brace-format
 msgid "Output received: {output}"
 msgstr "Полученный вывод: {output}"
 
-#: speedgtk.py:2615
+#: speedgtk.py:2648
 msgid "Try again"
 msgstr "Повторить"
 
-#: speedgtk.py:2641
+#: speedgtk.py:2674
 msgid "Loading the list…"
 msgstr "Загрузка списка…"
 
-#: speedgtk.py:2664
+#: speedgtk.py:2697
 msgid "Could not load the servers"
 msgstr "Не удалось загрузить серверы"
 
-#: speedgtk.py:2671
+#: speedgtk.py:2704
 #, python-brace-format
 msgid "Refresh the server list — nearby: {count}"
 msgstr "Обновить список серверов — рядом: {count}"
 
-#: speedgtk.py:2690 speedgtk.py:3091
+#: speedgtk.py:2723 speedgtk.py:3176
 msgid "id"
 msgstr "ID"
 
-#: speedgtk.py:2705 speedgtk.py:2706
+#: speedgtk.py:2738 speedgtk.py:2739
 msgid "Automatic"
 msgstr "Автоматически"
 
-#: speedgtk.py:2708
+#: speedgtk.py:2741
 #, python-brace-format
 msgid "Last one: {server}"
 msgstr "Последний: {server}"
 
-#: speedgtk.py:2710
+#: speedgtk.py:2743
 msgid "Picked by speedtest, by latency"
 msgstr "Выбирает speedtest, по задержке"
 
-#: speedgtk.py:2749
+#: speedgtk.py:2782
 msgid "Ignored: a manual ID is set"
 msgstr "Не учитывается: задан ID вручную"
 
-#: speedgtk.py:2769
+#: speedgtk.py:2802
 msgid "The manual server ID must be a number"
 msgstr "ID сервера, заданный вручную, должен быть числом"
 
-#: speedgtk.py:2784
+#: speedgtk.py:2817
 msgid "Cancelling…"
 msgstr "Отмена…"
 
-#: speedgtk.py:2808
+#: speedgtk.py:2841
 msgid "Cannot start speedtest"
 msgstr "Не удалось запустить speedtest"
 
-#: speedgtk.py:2819
+#: speedgtk.py:2852
 msgid "Repeat test"
 msgstr "Повторить тест"
 
-#: speedgtk.py:2833
+#: speedgtk.py:2867
 msgid "Starting…"
 msgstr "Запуск…"
 
-#: speedgtk.py:2959
+#: speedgtk.py:3048
 msgid "not available"
 msgstr "недоступно"
 
-#: speedgtk.py:3002
+#: speedgtk.py:3091
 msgid "Test started…"
 msgstr "Тест запущен…"
 
-#: speedgtk.py:3007
+#: speedgtk.py:3096
 msgid "Measuring ping…"
 msgstr "Измерение пинга…"
 
-#: speedgtk.py:3019
+#: speedgtk.py:3108
 msgid "Download…"
 msgstr "Скачивание…"
 
-#: speedgtk.py:3019
+#: speedgtk.py:3108
 msgid "Upload…"
 msgstr "Отправка…"
 
-#: speedgtk.py:3059
+#: speedgtk.py:3144
 msgid "Completed"
 msgstr "Завершено"
 
-#: speedgtk.py:3113 speedgtk.py:3115
+#: speedgtk.py:3198 speedgtk.py:3200
 msgid "Test cancelled"
 msgstr "Тест отменён"
 
-#: speedgtk.py:3120 speedgtk.py:3130
+#: speedgtk.py:3205 speedgtk.py:3215
 msgid "Error"
 msgstr "Ошибка"
 
-#: speedgtk.py:3128
+#: speedgtk.py:3213
 #, python-brace-format
 msgid "speedtest exited with code {code}"
 msgstr "speedtest завершился с кодом {code}"
 
-#: speedgtk.py:3143
+#: speedgtk.py:3229
 msgid "Details"
 msgstr "Подробности"
 
-#: speedgtk.py:3149
+#: speedgtk.py:3235
 msgid "speedtest error"
 msgstr "Ошибка speedtest"
 
-#: speedgtk.py:3150
+#: speedgtk.py:3236
 msgid "Close"
 msgstr "Закрыть"
 
-#: speedgtk.py:3194
+#: speedgtk.py:3280
 msgid ""
 "Usage: speedgtk.py [options]\n"
 "\n"
@@ -659,6 +663,9 @@ msgstr ""
 "\n"
 "Оба параметра действуют только для этого запуска; постоянные настройки —\n"
 "в Параметрах (Ctrl+,). История тестов: Ctrl+H.\n"
+
+#~ msgid "Online result"
+#~ msgstr "Результат в сети"
 
 #~ msgid ""
 #~ "The <tt>speedtest</tt> command on this system is not Ookla's official "
