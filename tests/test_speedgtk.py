@@ -6,6 +6,7 @@ import unittest
 
 import speedgtk
 from speedgtk.domain.history import history_metric, sorted_history_entries
+from speedgtk.speedtest.parser import loaded_latency, parse_jsonl_line
 
 
 class TranslationTests(unittest.TestCase):
@@ -125,6 +126,18 @@ class CliErrorTests(unittest.TestCase):
         self.assertIn("temporarily limiting", detail)
 
 
+class JsonlParserTests(unittest.TestCase):
+    def test_parser_accepts_objects_and_ignores_other_lines(self):
+        self.assertEqual(parse_jsonl_line('{"type":"ping"}'), {"type": "ping"})
+        self.assertIsNone(parse_jsonl_line("Speedtest by Ookla"))
+        self.assertIsNone(parse_jsonl_line("[1, 2, 3]"))
+
+    def test_loaded_latency_accepts_numeric_and_iqm_payloads(self):
+        self.assertEqual(loaded_latency(12.5), 12.5)
+        self.assertEqual(loaded_latency({"iqm": 18.75}), 18.75)
+        self.assertIsNone(loaded_latency(None))
+
+
 class HistoryRankingTests(unittest.TestCase):
     def test_invalid_history_metrics_are_rejected(self):
         self.assertEqual(history_metric({"download": 10}, "download"), 10.0)
@@ -152,7 +165,6 @@ class EventHandlingTests(unittest.TestCase):
             _show_latency=lambda kind, value, jitter=None: calls.append(
                 ("latency", kind, value)
             ),
-            _loaded_latency=speedgtk.SpeedGTKWindow._loaded_latency,
             _apply_result=lambda event: calls.append(("result", event)),
             _last_error=None,
         )

@@ -18,7 +18,6 @@ Requisiti: GTK 4, libadwaita >= 1.5, PyGObject, e la CLI ufficiale `speedtest`.
 
 import json
 import math
-import signal
 import sys
 
 import cairo
@@ -38,7 +37,6 @@ from .config import (  # noqa: E402
     APP_VERSION,
     BIN,
     HISTORY_LIMIT,
-    KILL_GRACE_SECONDS,
     LAYOUT_TRANSITION_DURATION_MS,
     OOKLA_SIGNATURE,
     PLACEHOLDER,
@@ -56,22 +54,13 @@ from .i18n import (  # noqa: E402
     language_names,
 )
 from .storage import History, Settings  # noqa: E402
-
-# Righe che la CLI scrive su stderr anche quando va tutto bene (informativa
-# privacy alla prima esecuzione): non sono errori e non vanno mostrate.
-BENIGN_STDERR = (
-    "Ookla collects certain data",
-    "License acceptance recorded",
-    "speedtest.net/privacy",
-    "personally identifiable",
-    "legitimate interest",
-    "faster internet",
-    "shared, where the data",
-    "please see our Privacy Policy",
-    "industry regulators",
-    "identifiers or location",
+from .speedtest import (  # noqa: E402
+    SpeedtestRun,
+    extract_cli_error,
+    humanize_cli_error,
+    run_and_capture,
 )
-
+from .speedtest.parser import loaded_latency  # noqa: E402
 
 HISTORY_SORTS = (
     ("date", N_("Sort by date (default)")),
@@ -86,88 +75,6 @@ THEME_OPTIONS = (
     ("light", N_("Light")),
     ("dark", N_("Dark")),
 )
-
-
-# CLI errors are mapped to a short toast and an optional detailed explanation.
-# La riga breve deve stare in un toast senza troncarsi, i dettagli vanno nel
-# dialogo che si apre dal pulsante "Details".
-CLI_ERROR_HINTS = (
-    (
-        "too many requests",
-        N_("Too many tests in a short time"),
-        N_(
-            "Ookla is temporarily limiting this connection because too many tests "
-            "were run in a short time. Wait a few minutes before repeating it."
-        ),
-    ),
-    (
-        "no servers",
-        N_("No test server available"),
-        N_(
-            "Ookla returned no usable server. Refresh the list, or pick a "
-            "different server, and try again."
-        ),
-    ),
-    (
-        "could not retrieve or read configuration",
-        N_("Cannot reach Ookla's servers"),
-        N_(
-            "The configuration service could not be reached. Check that the "
-            "connection is working and that no proxy or firewall is blocking it."
-        ),
-    ),
-    (
-        "name resolution",
-        N_("Name resolution failed"),
-        N_("The server name could not be resolved: this usually points at a DNS problem."),
-    ),
-    (
-        "cannot resolve",
-        N_("Name resolution failed"),
-        N_("The server name could not be resolved: this usually points at a DNS problem."),
-    ),
-    (
-        "timeout",
-        N_("The connection timed out"),
-        N_("The test server did not answer in time. It may be overloaded: try another one."),
-    ),
-    (
-        "cannot open socket",
-        N_("Cannot connect to the test server"),
-        N_("The connection to the chosen server could not be opened. Try another server."),
-    ),
-    (
-        "socket error",
-        N_("Cannot connect to the test server"),
-        N_("The connection to the chosen server could not be opened. Try another server."),
-    ),
-    (
-        "unable to connect",
-        N_("Cannot connect to the test server"),
-        N_("The connection to the chosen server could not be opened. Try another server."),
-    ),
-    (
-        "forbidden",
-        N_("Request refused by the server"),
-        N_("The test server refused the request. Try a different server."),
-    ),
-    (
-        "interrupted",
-        N_("Test interrupted"),
-        N_("The test ended early. Check that the connection stayed up."),
-    ),
-)
-
-
-def humanize_cli_error(raw_message):
-    """(riga breve tradotta, spiegazione tradotta o None) per un errore della CLI."""
-    lowered = (raw_message or "").lower()
-    for needle, short, detail in CLI_ERROR_HINTS:
-        if needle in lowered:
-            return _(short), _(detail)
-    if raw_message:
-        return raw_message, None
-    return _("speedtest reported an unspecified error"), None
 
 
 # --- Tachimetro -----------------------------------------------------------
@@ -215,80 +122,6 @@ class ServerItem(GObject.Object):
         self.server_id = server_id  # None = scelta automatica
 
 
-def call_later(func, *args):
-    """Esegue `func(*args)` al prossimo giro di main loop."""
-
-    def _once():
-        func(*args)
-        return GLib.SOURCE_REMOVE
-
-    GLib.idle_add(_once)
-
-
-def is_cancelled(err):
-    return err.matches(Gio.io_error_quark(), Gio.IOErrorEnum.CANCELLED)
-
-
-def extract_cli_error(stdout_text, stderr_text):
-    """Cerca un messaggio d'errore leggibile nell'output della CLI.
-
-    Prima nelle righe JSON di stdout (la 1.2 riporta gli errori lì), poi
-    nell'ultima riga utile di stderr, saltando l'informativa GDPR.
-    """
-    for line in reversed(stdout_text.splitlines()):
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
-        try:
-            event = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(event, dict) and (event.get("type") == "error" or event.get("level") == "error"):
-            message = event.get("message") or event.get("error")
-            if message:
-                return str(message)
-
-    for line in reversed(stderr_text.splitlines()):
-        line = line.strip()
-        if not line or set(line) <= {"=", "-", "*"}:
-            continue
-        if any(noise in line for noise in BENIGN_STDERR):
-            continue
-        return line
-    return ""
-
-
-def run_and_capture(argv, callback, cancellable=None):
-    """Lancia `argv` e ne cattura stdout/stderr in modo asincrono.
-
-    Chiama `callback(status, stdout, stderr)` sul main loop a fine processo.
-    `status < 0` significa "non è stato possibile eseguire il comando".
-    """
-    try:
-        proc = Gio.Subprocess.new(
-            argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-        )
-    except GLib.Error as err:
-        call_later(callback, -1, "", err.message)
-        return None
-
-    def _on_done(process, result):
-        try:
-            _ok, out, errout = process.communicate_utf8_finish(result)
-        except GLib.Error as err:
-            if not is_cancelled(err):
-                callback(-1, "", err.message)
-            return
-        status = process.get_exit_status() if process.get_if_exited() else -1
-        callback(status, out or "", errout or "")
-
-    proc.communicate_utf8_async(None, cancellable, _on_done)
-    return proc
-
-
-# ---------------------------------------------------------------------------
-# Colori: presi dallo stile del widget, così il disegno segue il tema di sistema
-# ---------------------------------------------------------------------------
 def text_rgba(widget):
     """Colore del testo corrente (chiaro/scuro lo decide il tema)."""
     return widget.get_color()
@@ -1269,107 +1102,6 @@ class PhaseProgress(Gtk.DrawingArea):
         cr.set_source(gradient)
         cr.rectangle(0, 0, filled, height)
         cr.fill()
-
-
-class SpeedtestRun:
-    """Una esecuzione di `speedtest --format=jsonl`, letta riga per riga.
-
-    `on_event(dict)` viene chiamata per ogni oggetto JSON di stdout;
-    `on_done(status, stderr_text, cancelled)` una sola volta, quando il
-    processo è uscito ed entrambe le pipe sono a EOF.
-    """
-
-    def __init__(self, argv, on_event, on_done):
-        self._on_event = on_event
-        self._on_done = on_done
-        self._stderr_lines = []
-        self._cancelled = False
-        self._finished = False
-        # Ci servono tre segnali di completamento: EOF su stdout, EOF su stderr
-        # e la terminazione del processo. Solo allora chiamiamo on_done().
-        self._pending = 3
-
-        # Può sollevare GLib.Error se il binario sparisce fra il check e qui.
-        self._proc = Gio.Subprocess.new(
-            argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-        )
-
-        stdout = Gio.DataInputStream.new(self._proc.get_stdout_pipe())
-        stderr = Gio.DataInputStream.new(self._proc.get_stderr_pipe())
-        self._read_next(stdout, self._handle_stdout_line)
-        self._read_next(stderr, self._stderr_lines.append)
-
-        # Nessun Gio.Cancellable sulle letture: annullare vuol dire terminare il
-        # processo, e a quel punto le pipe vanno a EOF da sole. Smettere di
-        # leggere mentre il figlio scrive lo bloccherebbe su una pipe piena.
-        self._proc.wait_async(None, self._on_wait_done)
-
-    # ------------------------------------------------------------------
-    # Lettura asincrona delle pipe
-    # ------------------------------------------------------------------
-    def _read_next(self, stream, handler):
-        stream.read_line_async(GLib.PRIORITY_DEFAULT, None, self._on_line, handler)
-
-    def _on_line(self, stream, result, handler):
-        try:
-            line, _length = stream.read_line_finish_utf8(result)
-        except GLib.Error:
-            line = None  # errore di lettura: lo trattiamo come fine stream
-        if line is None:
-            self._step()  # EOF
-            return
-        handler(line)
-        self._read_next(stream, handler)
-
-    def _handle_stdout_line(self, line):
-        line = line.strip()
-        if not line:
-            return
-        try:
-            event = json.loads(line)
-        except ValueError:
-            return  # righe non JSON (banner, warning): ignorate
-        if isinstance(event, dict):
-            self._on_event(event)
-
-    # ------------------------------------------------------------------
-    # Terminazione
-    # ------------------------------------------------------------------
-    def cancel(self):
-        """Annullamento pulito: SIGTERM, con SIGKILL di riserva."""
-        if self._finished or self._cancelled:
-            return
-        self._cancelled = True
-        self._proc.send_signal(signal.SIGTERM)
-        GLib.timeout_add_seconds(KILL_GRACE_SECONDS, self._force_exit)
-
-    def kill(self):
-        """Terminazione immediata (usata alla chiusura della finestra)."""
-        if not self._finished:
-            self._cancelled = True
-            self._proc.force_exit()
-
-    def _force_exit(self):
-        if not self._finished:
-            self._proc.force_exit()
-        return GLib.SOURCE_REMOVE
-
-    def _on_wait_done(self, process, result):
-        try:
-            process.wait_finish(result)
-        except GLib.Error:
-            pass
-        self._step()
-
-    def _step(self):
-        self._pending -= 1
-        if self._pending > 0 or self._finished:
-            return
-        self._finished = True
-        # get_exit_status() è valido solo se il processo è uscito da sé: se è
-        # stato terminato da un segnale (annullamento) usiamo -1.
-        status = self._proc.get_exit_status() if self._proc.get_if_exited() else -1
-        self._on_done(status, "\n".join(self._stderr_lines), self._cancelled)
 
 
 class SpeedGTKWindow(Adw.ApplicationWindow):
@@ -2608,15 +2340,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             self._jitter = jitter
             self._render_jitter(jitter)
 
-    @staticmethod
-    def _loaded_latency(latency):
-        """Ricava l'IQM della latenza sotto carico da un evento della CLI."""
-        if isinstance(latency, (int, float)):
-            return latency
-        if isinstance(latency, dict):
-            return latency.get("iqm")
-        return None
-
     def _render_loss(self, loss):
         rendered = format_number(loss, 1)
         self._loss_label.set_label(f"{rendered} %")
@@ -2692,7 +2415,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             bandwidth = data.get("bandwidth")
             if isinstance(bandwidth, (int, float)):
                 self._show_speed(event_type, mbps(bandwidth))
-            self._show_latency(event_type, self._loaded_latency(data.get("latency")))
+            self._show_latency(event_type, loaded_latency(data.get("latency")))
 
         elif event_type == "result":
             self._apply_result(event)
