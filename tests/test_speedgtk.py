@@ -5,8 +5,13 @@ import types
 import unittest
 
 import speedgtk
-from speedgtk.domain.history import history_metric, sorted_history_entries
+from speedgtk.domain.history import (
+    history_entry_from_result,
+    history_metric,
+    sorted_history_entries,
+)
 from speedgtk.speedtest.parser import loaded_latency, parse_jsonl_line
+from speedgtk.ui.server_picker import resolve_server_id
 
 
 class TranslationTests(unittest.TestCase):
@@ -138,6 +143,17 @@ class JsonlParserTests(unittest.TestCase):
         self.assertIsNone(loaded_latency(None))
 
 
+class ServerSelectionTests(unittest.TestCase):
+    def test_manual_server_id_takes_precedence(self):
+        self.assertEqual(resolve_server_id(" 123 ", 456), "123")
+        self.assertEqual(resolve_server_id("", 456), "456")
+        self.assertIsNone(resolve_server_id("", None))
+
+    def test_manual_server_id_must_be_numeric(self):
+        with self.assertRaisesRegex(ValueError, "must be a number"):
+            resolve_server_id("abc", 456)
+
+
 class HistoryRankingTests(unittest.TestCase):
     def test_invalid_history_metrics_are_rejected(self):
         self.assertEqual(history_metric({"download": 10}, "download"), 10.0)
@@ -154,17 +170,43 @@ class HistoryRankingTests(unittest.TestCase):
 
         self.assertEqual([entry["timestamp"] for entry in ranked_entries], ["b", "a", "c"])
 
+    def test_final_event_is_mapped_to_the_existing_history_schema(self):
+        entry = history_entry_from_result(
+            {
+                "timestamp": "2026-08-09T12:00:00Z",
+                "ping": {"latency": 8.5, "jitter": 0.8},
+                "packetLoss": 0,
+                "isp": "Example ISP",
+                "server": {
+                    "id": 42,
+                    "name": "Example",
+                    "location": "Rome",
+                    "country": "Italy",
+                },
+                "result": {"url": "https://example.test/result"},
+            },
+            {"download": 900.0, "upload": 300.0},
+        )
+
+        self.assertEqual(entry["download"], 900.0)
+        self.assertEqual(entry["server"], "Example — Rome (Italy)")
+        self.assertEqual(entry["server_id"], 42)
+        self.assertEqual(entry["url"], "https://example.test/result")
+
 
 class EventHandlingTests(unittest.TestCase):
     def test_download_event_changes_phase_before_rendering_speed(self):
         calls = []
+        measurements = types.SimpleNamespace(
+            show_speed=lambda kind, value: calls.append(("speed", kind, value)),
+            show_latency=lambda kind, value, jitter=None: calls.append(
+                ("latency", kind, value)
+            ),
+        )
         window = types.SimpleNamespace(
             _set_phase=lambda phase, text: calls.append(("phase", phase)),
             _set_progress=lambda progress: calls.append(("progress", progress)),
-            _show_speed=lambda kind, value: calls.append(("speed", kind, value)),
-            _show_latency=lambda kind, value, jitter=None: calls.append(
-                ("latency", kind, value)
-            ),
+            _measurements=measurements,
             _apply_result=lambda event: calls.append(("result", event)),
             _last_error=None,
         )

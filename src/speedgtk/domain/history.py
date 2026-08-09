@@ -95,3 +95,24 @@ def sorted_history_entries(entries, sort_order):
         ),
         reverse=True,
     )
+
+
+def history_entry_from_result(event, live_speeds):
+    """Build the stable on-disk history schema from a final CLI event."""
+    server = event.get("server") if isinstance(event.get("server"), dict) else {}
+    return {
+        "timestamp": event.get("timestamp"),
+        "download": live_speeds.get("download"),
+        "upload": live_speeds.get("upload"),
+        "ping": event.get("ping", {}).get("latency"),
+        "jitter": event.get("ping", {}).get("jitter"),
+        "loss": event.get("packetLoss"),
+        "server": "{} — {} ({})".format(
+            server.get("name", "?"),
+            server.get("location", "?"),
+            server.get("country", "?"),
+        ),
+        "server_id": server.get("id"),
+        "isp": event.get("isp"),
+        "url": event.get("result", {}).get("url"),
+    }
