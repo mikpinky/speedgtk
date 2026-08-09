@@ -730,6 +730,7 @@ class SpeedGauge(Gtk.DrawingArea):
     VALUE_OFFSET = 0.223
     UNIT_SIZE = 0.048
     UNIT_OFFSET = 0.335
+    VIGNETTE_DITHER_SIZE = 64
 
     # Ritocchi della scala fino a 1 Gbps. Modifica liberamente le coppie
     # (orizzontale, verticale): ogni unità corrisponde alla larghezza media di
@@ -768,6 +769,8 @@ class SpeedGauge(Gtk.DrawingArea):
         self._scale_progress = 1.0
         self._use_accent = False
         self._auto_range = True
+        self._vignette_dither_surface = None
+        self._vignette_dither_key = None
 
         # Dimensione naturale: con vexpand il quadrante cresce se c'è spazio.
         self.set_content_width(330)
@@ -982,19 +985,86 @@ class SpeedGauge(Gtk.DrawingArea):
 
         self._draw_vignette(cr, cx, cy, r_inner, base)
         self._draw_track(cr, cx, cy, r_mid, base)
+        self._draw_inner_glow(cr, cx, cy, r_mid, ring, stops)
         self._draw_fill(cr, cx, cy, r_mid, stops)
         self._draw_ticks(cr, cx, cy, size, r_inner, base)
         self._draw_needle(cr, cx, cy, size, base)
         self._draw_readout(cr, cx, cy, size, base, stops)
 
     def _draw_vignette(self, cr, cx, cy, radius, base):
-        """Alone appena accennato dentro l'arco: dà profondità al quadrante."""
+        """Profondità del quadrante, interamente disegnata dal backend Cairo.
+
+        Le fermate seguono una curva più ripida verso il bordo: centro ed
+        estremità restano rispettivamente a 0 e 0,035 alpha, ma le poche fasce
+        di grigio più visibili diventano più sottili. A differenza del dithering
+        raster, non c'è alcun lavoro Python proporzionale ai pixel durante un
+        ridimensionamento o l'animazione del layout.
+        """
         gradient = cairo.RadialGradient(cx, cy, radius * 0.15, cx, cy, radius)
-        gradient.add_color_stop_rgba(0.0, *base, 0.00)
-        gradient.add_color_stop_rgba(1.0, *base, 0.035)
+        for position, alpha in (
+            (0.00, 0.000),
+            (0.28, 0.002),
+            (0.52, 0.008),
+            (0.72, 0.016),
+            (0.88, 0.026),
+            (1.00, 0.035),
+        ):
+            gradient.add_color_stop_rgba(position, *base, alpha)
         cr.set_source(gradient)
         cr.arc(cx, cy, radius, 0, 2 * math.pi)
         cr.fill()
+        self._draw_vignette_dither(cr, cx, cy, radius, base)
+
+    def _draw_vignette_dither(self, cr, cx, cy, radius, base):
+        """Dither a un solo livello, ripetuto: elimina le bande senza rallentare.
+
+        La texture misura appena 64×64 px ed è costruita una sola volta per
+        tema. Cairo la ripete e la maschera in C, quindi il resize non fa più
+        lavoro proporzionale all'area del tachimetro.
+        """
+        base_key = tuple(round(component, 4) for component in base)
+        if base_key != self._vignette_dither_key:
+            self._vignette_dither_surface = self._make_vignette_dither_surface(base)
+            self._vignette_dither_key = base_key
+
+        pattern = cairo.SurfacePattern(self._vignette_dither_surface)
+        pattern.set_extend(cairo.Extend.REPEAT)
+        pattern.set_filter(cairo.Filter.NEAREST)
+        alpha_mask = cairo.RadialGradient(cx, cy, radius * 0.15, cx, cy, radius)
+        for position, alpha in ((0.00, 0.0), (0.20, 1.0), (0.82, 1.0), (1.00, 0.0)):
+            alpha_mask.add_color_stop_rgba(position, 0.0, 0.0, 0.0, alpha)
+
+        cr.save()
+        cr.arc(cx, cy, radius, 0, 2 * math.pi)
+        cr.clip()
+        cr.set_source(pattern)
+        cr.mask(alpha_mask)
+        cr.restore()
+
+    def _make_vignette_dither_surface(self, base):
+        """Piccola texture di rumore stabile, con un solo livello alpha."""
+        size = self.VIGNETTE_DITHER_SIZE
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        words = memoryview(surface.get_data()).cast("I")
+        stride_words = surface.get_stride() // 4
+        red, green, blue = (round(component) for component in base)
+
+        for y in range(size):
+            for x in range(size):
+                # Distribuzione pseudocasuale fissa: metà dei pixel illumina
+                # appena il livello adiacente, metà resta trasparente.
+                noise_word = (
+                    (x * 0x1F123BB5) ^ (y * 0x5F356495) ^ ((x + y) * 0x27D4EB2D)
+                )
+                if ((noise_word >> 16) & 0xFF) >= 128:
+                    continue
+                if sys.byteorder == "little":
+                    words[y * stride_words + x] = blue | (green << 8) | (red << 16) | (1 << 24)
+                else:
+                    words[y * stride_words + x] = 1 | (red << 8) | (green << 16) | (blue << 24)
+
+        surface.mark_dirty()
+        return surface
 
     def _draw_track(self, cr, cx, cy, radius, base):
         """Traccia dell'arco: colore del testo con alpha bassa."""
@@ -1019,6 +1089,63 @@ class SpeedGauge(Gtk.DrawingArea):
             # micro-sovrapposizione: evita le righine chiare fra un segmento e l'altro
             cr.arc(cx, cy, radius, self._angle(start) - 0.004, self._angle(end) + 0.004)
             cr.stroke()
+
+    def _draw_inner_glow(self, cr, cx, cy, radius, ring, stops):
+        """Alone colorato che sfuma dall'interno dell'arco verso il quadrante.
+
+        Una maschera radiale continua sostituisce gli archi concentrici: il
+        bordo resta morbido anche su display molto nitidi, senza rendere visibili
+        livelli distinti. Il bagliore si spinge all'interno per 1,25 spessori
+        d'arco: abbastanza da restare chiaramente leggibile senza sembrare un
+        secondo anello.
+        """
+        fraction = self._fraction(self._value)
+        if fraction <= 0.0:
+            return
+
+        cr.save()
+        start_angle = self._angle(0.0)
+        end_angle = self._angle(fraction)
+        # L'estremità esterna invade appena il pieno: _draw_fill() la copre
+        # subito dopo e lascia il picco di luminosità esattamente al suo bordo
+        # interno. Quella interna porta il glow a 1,25 spessori oltre il bordo
+        # dell'arco, così si legge bene anche sui temi scuri.
+        glow_outer_radius = radius - ring * 0.30
+        glow_inner_radius = radius - ring * (0.50 + 1.25)
+
+        # Limitiamo il gradiente al solo settore attivo dell'anello, evitando
+        # qualunque alone fuori dall'arco o dietro le tacche.
+        cr.arc(cx, cy, glow_outer_radius, start_angle, end_angle)
+        cr.arc_negative(cx, cy, glow_inner_radius, end_angle, start_angle)
+        cr.close_path()
+        cr.clip()
+
+        gradient_start = (
+            cx + radius * math.cos(start_angle),
+            cy + radius * math.sin(start_angle),
+        )
+        gradient_end = (
+            cx + radius * math.cos(self._angle(1.0)),
+            cy + radius * math.sin(self._angle(1.0)),
+        )
+        color_gradient = cairo.LinearGradient(*gradient_start, *gradient_end)
+        for position, color in stops:
+            color_gradient.add_color_stop_rgb(position, *color)
+        cr.set_source(color_gradient)
+
+        alpha_mask = cairo.RadialGradient(
+            cx, cy, glow_inner_radius, cx, cy, glow_outer_radius
+        )
+        for position, alpha in (
+            (0.00, 0.0),
+            (0.30, 0.020),
+            (0.58, 0.120),
+            (0.80, 0.340),
+            (1.00, 0.600),
+        ):
+            alpha_mask.add_color_stop_rgba(position, 0.0, 0.0, 0.0, alpha)
+        cr.mask(alpha_mask)
+        cr.restore()
 
     def _draw_ticks(self, cr, cx, cy, size, r_inner, base):
         if self._scale_from_index is None:
@@ -1359,7 +1486,7 @@ class DetailIcon(Gtk.DrawingArea):
 
         cr.set_source_rgba(text.red, text.green, text.blue, 0.72)
         cr.set_line_width(max(0.75, size * 0.032))
-        if self._kind == "server":
+        if self._kind == "isp":
             cr.arc(cx, cy - size * 0.105, size * 0.125, 0, 2 * math.pi)
             cr.stroke()
             # Busto più basso della testa e schiacciato: la linea resta aperta
@@ -1373,7 +1500,7 @@ class DetailIcon(Gtk.DrawingArea):
             cr.stroke()
             return
 
-        # ISP: tre piccoli server, uno centrale sopra due affiancati.
+        # Server: tre piccoli nodi, uno centrale sopra due affiancati.
         # Riduciamo sia ciascun server sia il gruppo attorno al suo centro,
         # così gli angoli inferiori non sfiorano il bordo del cerchio.
         box_width = size * 0.23
@@ -1726,15 +1853,15 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         # evento del test. Di conseguenza anche il tachimetro riceve meno
         # spazio a ogni frame, anziché ridursi in un unico scatto.
         self._details_group = Adw.PreferencesGroup()
-        self._server_detail_row = Adw.ActionRow(title=_("Server used"), subtitle=PLACEHOLDER)
-        self._server_detail_row.set_subtitle_selectable(True)
-        self._server_detail_row.add_prefix(DetailIcon("server"))
-        self._details_group.add(self._server_detail_row)
-
         self._isp_row = Adw.ActionRow(title=_("ISP"), subtitle=PLACEHOLDER)
         self._isp_row.set_subtitle_selectable(True)
         self._isp_row.add_prefix(DetailIcon("isp"))
         self._details_group.add(self._isp_row)
+
+        self._server_detail_row = Adw.ActionRow(title=_("Server used"), subtitle=PLACEHOLDER)
+        self._server_detail_row.set_subtitle_selectable(True)
+        self._server_detail_row.add_prefix(DetailIcon("server"))
+        self._details_group.add(self._server_detail_row)
 
         self._result_row = Adw.ActionRow(title=_("Online result"))
         self._result_link = Gtk.LinkButton.new_with_label("https://www.speedtest.net/", _("Open"))
@@ -1896,7 +2023,9 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _build_latency_stat(self, parent, phase, tooltip):
         """Coppia icona-valore per un ping idle o durante un trasferimento."""
         stat = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
-        icon = LatencyIcon(phase)
+        # 20 px conserva l'allineamento della riga, ma alleggerisce appena le
+        # tre icone rispetto alle intestazioni download/upload da 22 px.
+        icon = LatencyIcon(phase, size=20)
         icon.set_tooltip_text(tooltip)
         stat.append(icon)
         value = Gtk.Label(label=PLACEHOLDER, valign=Gtk.Align.CENTER)
