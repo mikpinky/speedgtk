@@ -24,9 +24,9 @@ GNOME application.
 - Interface available in English, Italian, German, Spanish, French and
   Russian.
 
-## Screenshots & Demos
+## Screenshots & Demos (from v1.6)
 
-### Live demos (from v1.6)
+### Live demos
 
 <table>
   <tr>
@@ -77,40 +77,67 @@ The application checks the command when it starts. On Debian-derived
 distributions it also displays copyable installation commands; other
 distributions are directed to Ookla's official installation page.
 
-## Install
+## Installation
 
-Clone the repository and install for the current user:
+### Install from source (recommended)
+
+Installing system-wide is the most reliable option across Linux
+distributions. Clone the repository, then install SpeedGTK with:
 
 ```bash
 git clone https://github.com/mikpinky/speedgtk.git
 cd speedgtk
-make install-user
-```
-
-After installation, launch **SpeedGTK** from the application menu or run:
-
-```bash
-speedgtk
-```
-
-For a system-wide installation:
-
-```bash
 sudo make install
 ```
 
-To remove a user installation:
+Launch **SpeedGTK** from the application menu or run `speedgtk`.
+
+To update an existing installation, pull the latest changes and run the same
+install command again. To uninstall it:
+
+```bash
+sudo make uninstall
+```
+
+System-wide removal preserves the user's history and preferences. It only
+resets the stored acceptance of the Ookla terms, which will be requested again
+if SpeedGTK is reinstalled.
+
+### AppImage
+
+The AppImage is tested on **Ubuntu 26.04** and is intended for reasonably
+modern Linux desktops running **GNOME 50 or newer**. Compatibility with other
+distributions is not guaranteed; if it does not work, installing from source
+is the recommended solution.
+
+Download `SpeedGTK-2.0-x86_64.AppImage` from the
+[GitHub release](https://github.com/mikpinky/speedgtk/releases/tag/v2.0), then
+make it executable and launch it:
+
+```bash
+chmod +x SpeedGTK-2.0-x86_64.AppImage
+./SpeedGTK-2.0-x86_64.AppImage
+```
+
+The AppImage does not include Ookla Speedtest CLI. The external `speedtest`
+command must still be installed separately and available in `PATH`.
+
+### Install for one user
+
+A local installation without administrator privileges remains available:
+
+```bash
+make install-user
+```
+
+Remove it with:
 
 ```bash
 make uninstall-user
 ```
 
-This removes the user installation, saved history, preferences and the stored
-Ookla terms acceptance.
-
-When removing a system-wide installation with `sudo make uninstall`, SpeedGTK
-resets the stored terms acceptance for the user who invoked `sudo`, while
-leaving that user's other preferences intact.
+Unlike system-wide removal, `make uninstall-user` also deletes SpeedGTK's
+saved history, preferences and stored Ookla terms acceptance.
 
 ## Development
 
