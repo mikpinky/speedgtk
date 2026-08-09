@@ -36,7 +36,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk, Pango, PangoCairo  # noq
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
-APP_VERSION = "1.6"
+APP_VERSION = "1.7"
 
 BIN = "speedtest"
 # Firma stampata da `speedtest --version`: serve a distinguere la CLI ufficiale
