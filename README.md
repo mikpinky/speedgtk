@@ -26,7 +26,7 @@ GNOME application.
 
 ## Screenshots & Demos
 
-### Live demos
+### Live demos (from v1.6)
 
 <table>
   <tr>
