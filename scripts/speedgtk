@@ -1,3 +1,4 @@
 #!/bin/sh
-# Questo file viene configurato dal Makefile al momento dell'installazione.
-exec python3 "@DATADIR@/speedgtk.py" "$@"
+# The Makefile replaces @DATADIR@ when the application is installed.
+export PYTHONPATH="@DATADIR@${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m speedgtk "$@"

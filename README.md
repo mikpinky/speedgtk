@@ -120,6 +120,12 @@ Run the basic syntax check with:
 make check
 ```
 
+Run the application directly from the source tree with:
+
+```bash
+make run
+```
+
 Translations are stored in [`po/`](po/). The project intentionally depends on
 the official Ookla CLI rather than the unrelated Python `speedtest-cli`
 utility, whose output format is incompatible with this application.

@@ -8,22 +8,26 @@ APPLICATIONSDIR := $(PREFIX)/share/applications
 ICONDIR := $(PREFIX)/share/icons/hicolor/scalable/apps
 USER_CONFIG_DIR ?= $(or $(XDG_CONFIG_HOME),$(HOME)/.config)
 
-.PHONY: all install install-user uninstall uninstall-user check test
+.PHONY: all install install-user uninstall uninstall-user check test run
 
 all:
 	@echo "Nothing to build: SpeedGTK is a Python application."
 
 check:
-	python3 -m py_compile speedgtk.py
-	python3 -m unittest discover -s tests
+	PYTHONPATH=src python3 -m compileall -q src/speedgtk
+	PYTHONPATH=src python3 -m unittest discover -s tests
 
 test:
-	python3 -m unittest discover -s tests -v
+	PYTHONPATH=src python3 -m unittest discover -s tests -v
+
+run:
+	PYTHONPATH=src python3 -m speedgtk
 
 install: check
 	install -d "$(DESTDIR)$(DATADIR)/po" "$(DESTDIR)$(BINDIR)" \
 		"$(DESTDIR)$(APPLICATIONSDIR)" "$(DESTDIR)$(ICONDIR)"
-	install -m 755 speedgtk.py "$(DESTDIR)$(DATADIR)/speedgtk.py"
+	cd src && find speedgtk -type f -name '*.py' -exec \
+		install -D -m 644 {} "$(DESTDIR)$(DATADIR)/{}" \;
 	install -m 644 po/*.po "$(DESTDIR)$(DATADIR)/po/"
 	sed 's|@DATADIR@|$(DATADIR)|g' scripts/speedgtk > "$(DESTDIR)$(BINDIR)/$(APP_NAME)"
 	chmod 755 "$(DESTDIR)$(BINDIR)/$(APP_NAME)"

@@ -61,12 +61,17 @@ KILL_GRACE_SECONDS = 3
 
 PLACEHOLDER = "—"
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+SOURCE_PO_DIR = os.path.abspath(os.path.join(PACKAGE_DIR, "..", "..", "po"))
+INSTALLED_PO_DIR = os.path.join(os.path.dirname(PACKAGE_DIR), "po")
 # Durante lo sviluppo le traduzioni vivono accanto allo script. L'installer le
 # copia invece sia lo script sia i cataloghi in $prefix/share/speedgtk. La
 # variabile consente inoltre a pacchetti di terze parti di scegliere un percorso
 # diverso, senza modificare il codice.
-PO_DIR = os.environ.get("SPEEDGTK_PO_DIR", os.path.join(SCRIPT_DIR, "po"))
+PO_DIR = os.environ.get(
+    "SPEEDGTK_PO_DIR",
+    SOURCE_PO_DIR if os.path.isdir(SOURCE_PO_DIR) else INSTALLED_PO_DIR,
+)
 
 # Preferenze e storico: file JSON nelle directory standard dell'utente.
 SETTINGS_PATH = os.path.join(GLib.get_user_config_dir(), "speedgtk", "settings.json")
