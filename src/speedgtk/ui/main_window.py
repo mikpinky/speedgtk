@@ -50,7 +50,10 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
         self._settings = settings
         self._history = history
+        self._closing = False
         self._run = None
+        self._version_run = None
+        self._servers_run = None
         self._servers_cancellable = None
         self._last_error = None
         self._result_url = None
@@ -239,14 +242,19 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _check_binary(self):
         if not self._settings["ookla_terms_accepted"]:
             return
+        if self._version_run is not None:
+            self._version_run.kill()
         self._stack.set_visible_child_name("loading")
         self._refresh_button.set_sensitive(False)
         if GLib.find_program_in_path(BIN) is None:
             self._show_unavailable(found=False, output="")
             return
-        run_and_capture([BIN, "--version"], self._on_version_done)
+        self._version_run = run_and_capture([BIN, "--version"], self._on_version_done)
 
     def _on_version_done(self, status, stdout_text, stderr_text):
+        self._version_run = None
+        if self._closing:
+            return
         blob = f"{stdout_text}\n{stderr_text}"
         if status < 0 or OOKLA_SIGNATURE not in blob:
             self._show_unavailable(found=status >= 0, output=blob.strip())
@@ -274,6 +282,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _load_servers(self):
         if not self._settings["ookla_terms_accepted"]:
             return
+        if self._servers_run is not None:
+            self._servers_run.kill()
         if self._servers_cancellable is not None:
             self._servers_cancellable.cancel()
         self._servers_cancellable = Gio.Cancellable()
@@ -281,13 +291,17 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._refresh_button.set_sensitive(False)
         self._server_picker.set_loading()
         # Consent is already recorded, so the CLI must not prompt on stdin.
-        run_and_capture(
+        self._servers_run = run_and_capture(
             [BIN, "--servers", "--format=json"] + self._accepted_cli_flags(),
             self._on_servers_done,
             self._servers_cancellable,
         )
 
     def _on_servers_done(self, status, stdout_text, stderr_text):
+        self._servers_run = None
+        self._servers_cancellable = None
+        if self._closing:
+            return
         self._refresh_button.set_sensitive(True)
 
         servers = None
@@ -426,6 +440,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._progress.set_phase(phase)
 
     def _on_event(self, event):
+        if getattr(self, "_closing", False):
+            return
         event_type = event.get("type")
 
         if event_type == "testStart":
@@ -506,6 +522,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
 
     def _on_run_done(self, status, stderr_text, cancelled):
         self._run = None
+        if self._closing:
+            return
         self._has_run = True
         self._set_running(False)
 
@@ -551,8 +569,20 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         alert.set_close_response("close")
         alert.present(self)
 
-    def _on_close_request(self, *_args):
+    def stop_processes(self):
+        """Force every CLI subprocess owned by this window to exit."""
+        self._closing = True
         self._cancel_progress_hide()
-        if self._run is not None:
-            self._run.kill()
+        self._cancel_result_action_delay()
+        if self._servers_cancellable is not None:
+            self._servers_cancellable.cancel()
+            self._servers_cancellable = None
+        for attribute in ("_version_run", "_servers_run", "_run"):
+            run = getattr(self, attribute)
+            if run is not None:
+                run.kill()
+                setattr(self, attribute, None)
+
+    def _on_close_request(self, *_args):
+        self.stop_processes()
         return False

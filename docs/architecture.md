@@ -42,6 +42,8 @@ __main__ -> application -> ui -> speedtest
 - Keep settings and history file paths and JSON schemas backward compatible.
 - Keep source translation strings stable unless catalogs are regenerated.
 - Never block the GLib main loop or stop draining child-process pipes.
+- Every CLI subprocess must be owned and force-terminated during window or
+  application shutdown.
 - Pass Ookla acceptance flags only after explicit user consent.
 - Keep custom drawing inside `ui/widgets`; process and domain code must not
   depend on GTK widgets.

@@ -31,6 +31,12 @@ class SpeedGTKApplication(Adw.Application):
             window = SpeedGTKWindow(self, self._settings, self._history)
         window.present()
 
+    def do_shutdown(self):
+        window = self.props.active_window
+        if window is not None:
+            window.stop_processes()
+        super().do_shutdown()
+
     def reload_ui(self, reopen_preferences=False):
         """Rebuild the window after a language change.
 
@@ -42,6 +48,7 @@ class SpeedGTKApplication(Adw.Application):
         window = SpeedGTKWindow(self, self._settings, self._history)
         window.present()
         if previous is not None:
+            previous.stop_processes()
             previous.destroy()
         if reopen_preferences:
             window._present_preferences()
