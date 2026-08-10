@@ -195,6 +195,30 @@ class HistoryRankingTests(unittest.TestCase):
 
 
 class EventHandlingTests(unittest.TestCase):
+    def test_cancelled_run_reveals_the_clear_action(self):
+        calls = []
+        window = types.SimpleNamespace(
+            _run=object(),
+            _closing=False,
+            _has_run=False,
+            _progress=types.SimpleNamespace(
+                set_fraction=lambda value: calls.append(("progress", value))
+            ),
+            _set_running=lambda running: calls.append(("running", running)),
+            _set_phase=lambda phase, text: calls.append(("phase", phase)),
+            _toast=lambda message: calls.append(("toast", message)),
+            _set_result_actions_visible=lambda visible: calls.append(
+                ("result-actions", visible)
+            ),
+        )
+
+        speedgtk.SpeedGTKWindow._on_run_done(window, -1, "", True)
+
+        self.assertIsNone(window._run)
+        self.assertTrue(window._has_run)
+        self.assertIn(("progress", 0.0), calls)
+        self.assertIn(("result-actions", True), calls)
+
     def test_download_event_changes_phase_before_rendering_speed(self):
         calls = []
         measurements = types.SimpleNamespace(

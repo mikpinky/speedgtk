@@ -531,6 +531,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             self._set_phase("idle", _("Test cancelled"))
             self._progress.set_fraction(0.0)
             self._toast(_("Test cancelled"))
+            self._set_result_actions_visible(True)
             return
 
         if self._last_error:
