@@ -110,13 +110,13 @@ modern Linux desktops running **GNOME 50 or newer**. Compatibility with other
 distributions is not guaranteed; if it does not work, installing from source
 is the recommended solution.
 
-Download `SpeedGTK-2.0-x86_64.AppImage` from the
-[GitHub release](https://github.com/mikpinky/speedgtk/releases/tag/v2.0), then
+Download `SpeedGTK-2.1-x86_64.AppImage` from the
+[GitHub release](https://github.com/mikpinky/speedgtk/releases/tag/v2.1), then
 make it executable and launch it:
 
 ```bash
-chmod +x SpeedGTK-2.0-x86_64.AppImage
-./SpeedGTK-2.0-x86_64.AppImage
+chmod +x SpeedGTK-2.1-x86_64.AppImage
+./SpeedGTK-2.1-x86_64.AppImage
 ```
 
 The AppImage does not include Ookla Speedtest CLI. The external `speedtest`
