@@ -41,7 +41,7 @@ class SpeedGauge(Gtk.DrawingArea):
 
     __gtype_name__ = "SpeedGauge"
 
-    PHASES = ("idle", "ping", "download", "upload", "done")
+    PHASES = ("idle", "ping", "download", "upload", "cancel", "done")
 
     # Geometry as fractions of the smaller widget dimension.
     R_OUTER = 0.470
@@ -193,6 +193,12 @@ class SpeedGauge(Gtk.DrawingArea):
         previous, self._phase = self._phase, phase
 
         if phase == "idle":
+            if previous == "cancel" and self._settling:
+                # Process cancellation usually completes before the reset
+                # animation; let the needle finish closing the active arc.
+                self._target = 0.0
+                self.queue_draw()
+                return
             self._settling = False
             self._target = 0.0
             self._color_phase = "download"
@@ -206,11 +212,19 @@ class SpeedGauge(Gtk.DrawingArea):
                 self._animate_to(0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC)
             else:
                 self._color_phase = phase
-        elif phase == "done" and self._value > 0.5:
-            # Close the arc in the last transfer color after completion.
+        elif phase in ("cancel", "done"):
+            # Close the arc in the last transfer color after completion or
+            # cancellation, discarding any target queued between phases.
             self._target = 0.0
-            self._settling = True
-            self._animate_to(0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC)
+            if not self._settling:
+                if self._value > 0.0:
+                    self._settling = True
+                    self._animate_to(
+                        0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC
+                    )
+                else:
+                    self._animation.pause()
+                    self.props.value = 0.0
 
         self.queue_draw()
 

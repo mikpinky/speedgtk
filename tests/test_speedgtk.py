@@ -5,7 +5,7 @@ import types
 import unittest
 
 import speedgtk
-from gi.repository import Pango
+from gi.repository import Adw, Pango
 from speedgtk.domain.history import (
     history_entry_from_result,
     history_metric,
@@ -18,6 +18,7 @@ from speedgtk.ui.dialogs.unavailable import (
     _verification_copy,
 )
 from speedgtk.ui.server_picker import resolve_server_id
+from speedgtk.ui.widgets.gauge import RESET_DURATION_MS, SpeedGauge
 
 
 class TranslationTests(unittest.TestCase):
@@ -300,6 +301,76 @@ class UnavailablePageTests(unittest.TestCase):
         self.assertNotIn("sudo", combined)
         self.assertNotIn("packagecloud", combined)
         self.assertEqual(OOKLA_INSTALL_URL, "https://www.speedtest.net/apps/cli")
+
+
+class GaugeCancellationTests(unittest.TestCase):
+    def test_cancel_uses_the_completed_test_reset_animation(self):
+        animations = []
+        gauge = types.SimpleNamespace(
+            PHASES=SpeedGauge.PHASES,
+            _phase="upload",
+            _value=750.0,
+            _target=750.0,
+            _settling=False,
+            _color_phase="upload",
+            _animate_to=lambda value, duration, easing: animations.append(
+                (value, duration, easing)
+            ),
+            queue_draw=lambda: None,
+        )
+
+        SpeedGauge.set_phase(gauge, "cancel")
+
+        self.assertEqual(gauge._phase, "cancel")
+        self.assertEqual(gauge._target, 0.0)
+        self.assertTrue(gauge._settling)
+        self.assertEqual(
+            animations,
+            [(0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC)],
+        )
+
+    def test_idle_state_does_not_interrupt_a_cancellation_reset(self):
+        pauses = []
+        props = types.SimpleNamespace(value=250.0)
+        gauge = types.SimpleNamespace(
+            PHASES=SpeedGauge.PHASES,
+            _phase="cancel",
+            _value=250.0,
+            _target=0.0,
+            _settling=True,
+            _color_phase="upload",
+            _animation=types.SimpleNamespace(pause=lambda: pauses.append(True)),
+            props=props,
+            queue_draw=lambda: None,
+        )
+
+        SpeedGauge.set_phase(gauge, "idle")
+
+        self.assertEqual(gauge._phase, "idle")
+        self.assertEqual(props.value, 250.0)
+        self.assertEqual(pauses, [])
+        self.assertTrue(gauge._settling)
+
+    def test_cancel_replaces_an_in_flight_tracking_animation_near_zero(self):
+        animations = []
+        gauge = types.SimpleNamespace(
+            PHASES=SpeedGauge.PHASES,
+            _phase="download",
+            _value=0.25,
+            _target=500.0,
+            _settling=False,
+            _color_phase="download",
+            _animate_to=lambda value, duration, easing: animations.append(
+                (value, duration, easing)
+            ),
+            queue_draw=lambda: None,
+        )
+
+        SpeedGauge.set_phase(gauge, "cancel")
+
+        self.assertEqual(gauge._target, 0.0)
+        self.assertTrue(gauge._settling)
+        self.assertEqual(animations[0][0], 0.0)
 
 
 if __name__ == "__main__":
