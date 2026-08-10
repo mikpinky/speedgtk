@@ -4,54 +4,65 @@ from gi.repository import Gtk
 
 from ...i18n import _
 
+OOKLA_INSTALL_URL = "https://www.speedtest.net/apps/cli"
+
+
+def _unavailable_copy(found):
+    """Return markup-safe guidance for a missing or incompatible CLI."""
+    if found:
+        return (
+            _("The speedtest command is not Ookla's official CLI"),
+            _(
+                "SpeedGTK found a command named <tt>speedtest</tt> in the system "
+                "<tt>PATH</tt>, but it is not Ookla's official Speedtest CLI.\n\n"
+                "It may be the unrelated Python program <tt>speedtest-cli</tt>, "
+                "which uses different options and output. Remove or rename the "
+                "conflicting command, then install the official CLI from Ookla."
+            ),
+        )
+    return (
+        _("Ookla Speedtest CLI was not found"),
+        _(
+            "SpeedGTK needs Ookla's <b>official Speedtest CLI</b> to run a test. "
+            "Its executable must be named <tt>speedtest</tt> and be available in "
+            "the system <tt>PATH</tt>—in other words, the same command must work "
+            "in a terminal.\n\n"
+            "Install it by following Ookla's instructions. Do not confuse it with "
+            "the unrelated Python program <tt>speedtest-cli</tt>."
+        ),
+    )
+
+
+def _verification_copy():
+    return _(
+        "After installing it, check that <tt>speedtest --version</tt> works in "
+        "a terminal, then return here and try again."
+    )
+
 
 def configure_unavailable_page(page, found, output, on_retry):
-    if found:
-        title = _("The `speedtest` found is not the official one")
-        description = _(
-            "The <tt>speedtest</tt> command on this system is not Ookla's official "
-            "CLI, but almost certainly the old Python script <tt>speedtest-cli</tt>."
-            "\n\n"
-            "They are two different programs: <tt>speedtest-cli</tt> is a third-party "
-            "project using unofficial APIs, it takes different options and supports "
-            "neither <tt>--format=jsonl</tt> nor the live progress updates this app "
-            "is built on.\n\n"
-            "On Debian-derived distributions, remove the old one and install the "
-            "official one with:"
-        )
-    else:
-        title = _("Ookla's `speedtest` CLI was not found")
-        description = _(
-            "This app is a frontend for Ookla's <b>official</b> CLI, which is not "
-            "installed.\n\n"
-            "Careful not to mix it up with <tt>speedtest-cli</tt>, the old "
-            "third-party Python script: same name, but different options and output, "
-            "and no <tt>--format=jsonl</tt>.\n\n"
-            "On Debian-derived distributions, you can install the official one with:"
-        )
+    title, description = _unavailable_copy(found)
 
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
     content.set_halign(Gtk.Align.CENTER)
-    commands = Gtk.Label(
-        label=(
-            "sudo apt remove speedtest-cli\n"
-            "curl -s https://packagecloud.io/install/repositories/ookla/"
-            "speedtest-cli/script.deb.sh | sudo bash\n"
-            "sudo apt install speedtest"
-        ),
+
+    verification = Gtk.Label(
+        label=_verification_copy(),
         selectable=True,
         wrap=True,
-        xalign=0,
+        use_markup=True,
+        justify=Gtk.Justification.CENTER,
+        max_width_chars=56,
     )
-    commands.add_css_class("monospace")
-    content.append(commands)
+    verification.add_css_class("dim-label")
+    content.append(verification)
 
-    other_distributions = Gtk.LinkButton(
-        uri="https://www.speedtest.net/apps/cli",
-        label=_("Installation instructions for other distributions"),
+    instructions = Gtk.LinkButton(
+        uri=OOKLA_INSTALL_URL,
+        label=_("Open Ookla's installation instructions"),
     )
-    other_distributions.set_halign(Gtk.Align.CENTER)
-    content.append(other_distributions)
+    instructions.set_halign(Gtk.Align.CENTER)
+    content.append(instructions)
 
     if output:
         received = Gtk.Label(
@@ -59,6 +70,7 @@ def configure_unavailable_page(page, found, output, on_retry):
             use_markup=False,
             wrap=True,
             xalign=0,
+            max_width_chars=60,
         )
         received.add_css_class("dim-label")
         received.add_css_class("caption")

@@ -5,12 +5,18 @@ import types
 import unittest
 
 import speedgtk
+from gi.repository import Pango
 from speedgtk.domain.history import (
     history_entry_from_result,
     history_metric,
     sorted_history_entries,
 )
 from speedgtk.speedtest.providers.ookla.parser import loaded_latency, parse_jsonl_line
+from speedgtk.ui.dialogs.unavailable import (
+    OOKLA_INSTALL_URL,
+    _unavailable_copy,
+    _verification_copy,
+)
 from speedgtk.ui.server_picker import resolve_server_id
 
 
@@ -261,6 +267,39 @@ class EventHandlingTests(unittest.TestCase):
         )
 
         self.assertEqual(window._last_error, "No servers")
+
+
+class UnavailablePageTests(unittest.TestCase):
+    def setUp(self):
+        self.previous_code = speedgtk.TRANSLATIONS.code
+        self.previous_requested_code = speedgtk.TRANSLATIONS._requested_code
+
+    def tearDown(self):
+        speedgtk.TRANSLATIONS.use(self.previous_requested_code)
+        speedgtk.TRANSLATIONS._code = self.previous_code
+
+    def test_guidance_uses_pango_markup_instead_of_markdown_backticks(self):
+        for code in speedgtk.TRANSLATIONS.available():
+            speedgtk.TRANSLATIONS.use(code)
+            for found in (False, True):
+                title, description = _unavailable_copy(found)
+                self.assertNotIn("`", title)
+                self.assertNotIn("`", description)
+                self.assertTrue(Pango.parse_markup(description, -1, "\x00")[0])
+            verification = _verification_copy()
+            self.assertNotIn("`", verification)
+            self.assertTrue(Pango.parse_markup(verification, -1, "\x00")[0])
+
+    def test_guidance_is_distribution_neutral(self):
+        speedgtk.TRANSLATIONS.use("en")
+        combined = " ".join(
+            part for found in (False, True) for part in _unavailable_copy(found)
+        )
+
+        self.assertIn("PATH", combined)
+        self.assertNotIn("sudo", combined)
+        self.assertNotIn("packagecloud", combined)
+        self.assertEqual(OOKLA_INSTALL_URL, "https://www.speedtest.net/apps/cli")
 
 
 if __name__ == "__main__":
