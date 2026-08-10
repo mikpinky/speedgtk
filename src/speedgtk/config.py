@@ -7,7 +7,7 @@ from gi.repository import GLib
 
 APP_ID = "io.github.speedgtk.SpeedGTK"
 APP_NAME = "SpeedGTK"
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 
 PROGRESS_INTERVAL_MS = 100
 PROGRESS_HIDE_DELAY_MS = 600

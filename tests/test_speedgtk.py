@@ -5,7 +5,7 @@ import types
 import unittest
 
 import speedgtk
-from gi.repository import Adw, Pango
+from gi.repository import Pango
 from speedgtk.domain.history import (
     history_entry_from_result,
     history_metric,
@@ -18,7 +18,7 @@ from speedgtk.ui.dialogs.unavailable import (
     _verification_copy,
 )
 from speedgtk.ui.server_picker import resolve_server_id
-from speedgtk.ui.widgets.gauge import RESET_DURATION_MS, SpeedGauge
+from speedgtk.ui.widgets.gauge import SpeedGauge
 
 
 class TranslationTests(unittest.TestCase):
@@ -305,7 +305,7 @@ class UnavailablePageTests(unittest.TestCase):
 
 class GaugeCancellationTests(unittest.TestCase):
     def test_cancel_uses_the_completed_test_reset_animation(self):
-        animations = []
+        resets = []
         gauge = types.SimpleNamespace(
             PHASES=SpeedGauge.PHASES,
             _phase="upload",
@@ -313,9 +313,7 @@ class GaugeCancellationTests(unittest.TestCase):
             _target=750.0,
             _settling=False,
             _color_phase="upload",
-            _animate_to=lambda value, duration, easing: animations.append(
-                (value, duration, easing)
-            ),
+            _animate_final_reset=lambda: resets.append(True),
             queue_draw=lambda: None,
         )
 
@@ -324,10 +322,7 @@ class GaugeCancellationTests(unittest.TestCase):
         self.assertEqual(gauge._phase, "cancel")
         self.assertEqual(gauge._target, 0.0)
         self.assertTrue(gauge._settling)
-        self.assertEqual(
-            animations,
-            [(0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC)],
-        )
+        self.assertEqual(resets, [True])
 
     def test_idle_state_does_not_interrupt_a_cancellation_reset(self):
         pauses = []
@@ -352,7 +347,7 @@ class GaugeCancellationTests(unittest.TestCase):
         self.assertTrue(gauge._settling)
 
     def test_cancel_replaces_an_in_flight_tracking_animation_near_zero(self):
-        animations = []
+        resets = []
         gauge = types.SimpleNamespace(
             PHASES=SpeedGauge.PHASES,
             _phase="download",
@@ -360,9 +355,7 @@ class GaugeCancellationTests(unittest.TestCase):
             _target=500.0,
             _settling=False,
             _color_phase="download",
-            _animate_to=lambda value, duration, easing: animations.append(
-                (value, duration, easing)
-            ),
+            _animate_final_reset=lambda: resets.append(True),
             queue_draw=lambda: None,
         )
 
@@ -370,7 +363,7 @@ class GaugeCancellationTests(unittest.TestCase):
 
         self.assertEqual(gauge._target, 0.0)
         self.assertTrue(gauge._settling)
-        self.assertEqual(animations[0][0], 0.0)
+        self.assertEqual(resets, [True])
 
 
 if __name__ == "__main__":

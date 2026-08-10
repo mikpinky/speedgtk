@@ -16,6 +16,7 @@ from ..theme import (
     surface_rgb,
     text_rgba,
 )
+from .gauge_animation import GaugeScaleTransition, NeedleResetAnimation
 from .gauge_glow import draw_inner_glow
 
 
@@ -27,9 +28,9 @@ GAUGE_SCALES = (
     (10000.0, (0, 1, 5, 10, 20, 50, 100, 300, 500, 1000, 2500, 5000, 10000)),
 )
 GAUGE_DEFAULT_SCALE = 1
+GAUGE_EXPANSION_THRESHOLD_MBPS = 960.0
 TRACK_DURATION_MS = 250
 RESET_DURATION_MS = 600
-SCALE_TRANSITION_DURATION_MS = 450
 
 
 class SpeedGauge(Gtk.DrawingArea):
@@ -88,9 +89,10 @@ class SpeedGauge(Gtk.DrawingArea):
         self._phase = "idle"
         self._color_phase = "download"
         self._settling = False
+        self._collapse_scale_after_reset = False
+        self._scale_reverse_started = False
+        self._needle_reset_midpoint = 0.0
         self._scale_index = GAUGE_DEFAULT_SCALE
-        self._scale_from_index = None
-        self._scale_progress = 1.0
         self._use_accent = False
         self._auto_range = True
         self._measurement_decimals = 2
@@ -108,15 +110,13 @@ class SpeedGauge(Gtk.DrawingArea):
         self._animation.set_easing(Adw.Easing.EASE_OUT_CUBIC)
         self._animation.connect("done", self._on_animation_done)
 
-        self._scale_animation = Adw.TimedAnimation.new(
-            self,
-            0.0,
-            1.0,
-            SCALE_TRANSITION_DURATION_MS,
-            Adw.PropertyAnimationTarget.new(self, "scale-progress"),
+        self._final_reset = NeedleResetAnimation(
+            self, self._set_reset_value, self._on_reset_animation_done
         )
-        self._scale_animation.set_easing(Adw.Easing.EASE_IN_OUT_CUBIC)
-        self._scale_animation.connect("done", self._on_scale_animation_done)
+
+        self._scale_transition = GaugeScaleTransition(
+            self, self.queue_draw, self._on_scale_collapsed
+        )
 
         # Theme and accent changes require a redraw without changing state.
         manager = Adw.StyleManager.get_default()
@@ -133,6 +133,13 @@ class SpeedGauge(Gtk.DrawingArea):
     @value.setter
     def value(self, new_value):
         self._value = float(new_value)
+        if (
+            self._settling
+            and self._collapse_scale_after_reset
+            and not self._scale_reverse_started
+            and self._value <= self._needle_reset_midpoint
+        ):
+            self._collapse_scale()
         self.queue_draw()
 
     @GObject.Property(type=bool, default=False)
@@ -157,16 +164,6 @@ class SpeedGauge(Gtk.DrawingArea):
     @GObject.Property(type=float, default=1000.0, flags=GObject.ParamFlags.READABLE)
     def max_value(self):
         return GAUGE_SCALES[self._scale_index][0]
-
-    @GObject.Property(type=float, default=1.0)
-    def scale_progress(self):
-        """Animation progress between two gauge scales."""
-        return self._scale_progress
-
-    @scale_progress.setter
-    def scale_progress(self, progress):
-        self._scale_progress = min(max(float(progress), 0.0), 1.0)
-        self.queue_draw()
 
     def set_target(self, speed):
         """Animate the needle toward a new speed."""
@@ -203,12 +200,16 @@ class SpeedGauge(Gtk.DrawingArea):
             self._target = 0.0
             self._color_phase = "download"
             self._animation.pause()
+            self._final_reset.pause()
             self.props.value = 0.0
         elif phase in ("download", "upload"):
+            self._collapse_scale_after_reset = False
+            self._scale_reverse_started = False
             if previous in ("download", "upload") and self._value > 0.5:
                 # Return to zero before following the next transfer phase, while
                 # retaining the previous color until the arc closes.
                 self._settling = True
+                self._needle_reset_midpoint = self._value * 0.5
                 self._animate_to(0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC)
             else:
                 self._color_phase = phase
@@ -216,15 +217,16 @@ class SpeedGauge(Gtk.DrawingArea):
             # Close the arc in the last transfer color after completion or
             # cancellation, discarding any target queued between phases.
             self._target = 0.0
-            if not self._settling:
-                if self._value > 0.0:
-                    self._settling = True
-                    self._animate_to(
-                        0.0, RESET_DURATION_MS, Adw.Easing.EASE_IN_OUT_CUBIC
-                    )
-                else:
-                    self._animation.pause()
-                    self.props.value = 0.0
+            self._collapse_scale_after_reset = True
+            self._scale_reverse_started = False
+            if self._value > 0.0:
+                self._settling = True
+                self._animate_final_reset()
+            else:
+                self._animation.pause()
+                self._final_reset.pause()
+                self.props.value = 0.0
+                self._collapse_scale()
 
         self.queue_draw()
 
@@ -234,6 +236,7 @@ class SpeedGauge(Gtk.DrawingArea):
         self.set_phase("idle")
 
     def _animate_to(self, target_value, duration_ms, easing):
+        self._final_reset.pause()
         animation = self._animation
         animation.set_value_from(self._value)
         animation.set_value_to(target_value)
@@ -242,7 +245,22 @@ class SpeedGauge(Gtk.DrawingArea):
         animation.reset()
         animation.play()
 
+    def _animate_final_reset(self):
+        """Return the needle to zero with the longer custom easing curve."""
+        self._animation.pause()
+        self._needle_reset_midpoint = self._value * 0.5
+        self._final_reset.start(self._value)
+
+    def _set_reset_value(self, value):
+        self.props.value = value
+
     def _on_animation_done(self, _animation):
+        self._complete_settling()
+
+    def _on_reset_animation_done(self):
+        self._complete_settling()
+
+    def _complete_settling(self):
         if not self._settling or self._value > 0.5:
             return
         self._settling = False
@@ -250,24 +268,50 @@ class SpeedGauge(Gtk.DrawingArea):
             self._color_phase = self._phase
         if self._target > 0.0:
             self._animate_to(self._target, TRACK_DURATION_MS, Adw.Easing.EASE_OUT_CUBIC)
+        elif self._collapse_scale_after_reset:
+            self._collapse_scale()
         else:
             self.queue_draw()
 
-    def _on_scale_animation_done(self, _animation):
-        self._scale_from_index = None
-        self.props.scale_progress = 1.0
+    def _collapse_scale(self):
+        if self._scale_reverse_started:
+            return
+        if self._scale_index <= GAUGE_DEFAULT_SCALE:
+            self._collapse_scale_after_reset = False
+            return
+        if self._scale_transition.reverse():
+            self._scale_reverse_started = True
+        else:
+            self._on_scale_collapsed(GAUGE_DEFAULT_SCALE)
+
+    def _on_scale_collapsed(self, scale_index):
+        self._scale_index = scale_index
+        self._collapse_scale_after_reset = False
+        self._scale_reverse_started = False
+        self.notify("max-value")
+        self.queue_draw()
 
     def _grow_range_for(self, speed):
         index = self._scale_index
-        while index + 1 < len(GAUGE_SCALES) and speed > GAUGE_SCALES[index][0]:
+        while index + 1 < len(GAUGE_SCALES):
+            threshold = (
+                GAUGE_EXPANSION_THRESHOLD_MBPS
+                if index == GAUGE_DEFAULT_SCALE
+                else GAUGE_SCALES[index][0]
+            )
+            if speed < threshold:
+                break
             index += 1
         if index != self._scale_index:
-            self._scale_from_index = self._scale_index
+            previous_index = self._scale_index
             self._scale_index = index
             self.notify("max-value")
-            self.props.scale_progress = 0.0
-            self._scale_animation.reset()
-            self._scale_animation.play()
+            self._scale_transition.start(previous_index, index)
+            self._scale_reverse_started = False
+        elif index > GAUGE_DEFAULT_SCALE and speed >= GAUGE_EXPANSION_THRESHOLD_MBPS:
+            # A new run can arrive while the previous reverse pass is active.
+            self._scale_transition.start(GAUGE_DEFAULT_SCALE, index)
+            self._scale_reverse_started = False
 
     def _fraction_for_scale(self, speed, scale_index):
         """Return a logarithmic 0–1 position along one scale.
@@ -281,11 +325,9 @@ class SpeedGauge(Gtk.DrawingArea):
 
     def _fraction(self, speed):
         """Interpolate the current position while the scale expands."""
-        if self._scale_from_index is None:
-            return self._fraction_for_scale(speed, self._scale_index)
-        before = self._fraction_for_scale(speed, self._scale_from_index)
-        after = self._fraction_for_scale(speed, self._scale_index)
-        return before + (after - before) * self._scale_progress
+        return self._scale_transition.fraction(
+            speed, self._scale_index, self._fraction_for_scale
+        )
 
     def _angle(self, fraction):
         return math.radians(GAUGE_START_DEG + GAUGE_SWEEP_DEG * fraction)
@@ -422,36 +464,23 @@ class SpeedGauge(Gtk.DrawingArea):
             cr.stroke()
 
     def _draw_ticks(self, cr, cx, cy, size, r_inner, base):
-        if self._scale_from_index is None:
-            for tick in GAUGE_SCALES[self._scale_index][1]:
-                geometry = self._tick_geometry(tick, self._scale_index, size, r_inner)
-                self._draw_tick(cr, cx, cy, size, base, tick, self._scale_index, geometry)
-            return
-
-        # Shared ticks move along the arc; removed and added ticks cross-fade.
-        before_index = self._scale_from_index
-        before_ticks = set(GAUGE_SCALES[before_index][1])
-        after_ticks = set(GAUGE_SCALES[self._scale_index][1])
-        progress = self._scale_progress
-        for tick in sorted(before_ticks | after_ticks):
-            if tick in before_ticks and tick in after_ticks:
-                before = self._tick_geometry(tick, before_index, size, r_inner)
-                after = self._tick_geometry(tick, self._scale_index, size, r_inner)
-                geometry = tuple(
-                    before_value + (after_value - before_value) * progress
-                    for before_value, after_value in zip(before, after)
-                )
-                self._draw_tick(cr, cx, cy, size, base, tick, self._scale_index, geometry)
-            elif tick in before_ticks:
-                geometry = self._tick_geometry(tick, before_index, size, r_inner)
-                self._draw_tick(
-                    cr, cx, cy, size, base, tick, before_index, geometry, opacity=1.0 - progress
-                )
-            else:
-                geometry = self._tick_geometry(tick, self._scale_index, size, r_inner)
-                self._draw_tick(
-                    cr, cx, cy, size, base, tick, self._scale_index, geometry, opacity=progress
-                )
+        geometry_for = lambda tick, scale_index: self._tick_geometry(
+            tick, scale_index, size, r_inner
+        )
+        for frame in self._scale_transition.tick_frames(
+            GAUGE_SCALES, self._scale_index, geometry_for
+        ):
+            self._draw_tick(
+                cr,
+                cx,
+                cy,
+                size,
+                base,
+                frame.value,
+                frame.scale_index,
+                frame.geometry,
+                opacity=frame.opacity,
+            )
 
     def _tick_geometry(self, tick, scale_index, size, r_inner):
         angle = self._angle(self._fraction_for_scale(tick, scale_index))
@@ -505,6 +534,8 @@ class SpeedGauge(Gtk.DrawingArea):
         """Use compact labels for multi-gigabit values."""
         if scale_index is None:
             scale_index = self._scale_index
+        if GAUGE_SCALES[scale_index][0] <= 1000.0 and tick == 1000:
+            return "1000"
         if GAUGE_SCALES[scale_index][0] > 1000.0 and tick in (1000, 2500, 5000, 10000):
             decimals = 1 if tick == 2500 else 0
             return "{}G".format(format_number(tick / 1000, decimals))

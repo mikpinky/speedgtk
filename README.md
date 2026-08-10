@@ -81,8 +81,11 @@ distributions are directed to Ookla's official installation page.
 
 ### Install from source (recommended)
 
-Installing system-wide is the most reliable option across Linux
-distributions. Clone the repository, then install SpeedGTK with:
+Cloning the repository and installing with Make is the recommended way to run
+the latest SpeedGTK version. It is also the most reliable option across Linux
+distributions; the AppImage is updated only for selected milestone releases.
+
+Clone the repository, then install SpeedGTK with:
 
 ```bash
 git clone https://github.com/mikpinky/speedgtk.git
@@ -110,13 +113,13 @@ modern Linux desktops running **GNOME 50 or newer**. Compatibility with other
 distributions is not guaranteed; if it does not work, installing from source
 is the recommended solution.
 
-Download `SpeedGTK-2.1-x86_64.AppImage` from the
-[GitHub release](https://github.com/mikpinky/speedgtk/releases/tag/v2.1), then
+Download `SpeedGTK-2.0-x86_64.AppImage` from the
+[GitHub release](https://github.com/mikpinky/speedgtk/releases/tag/v2.0), then
 make it executable and launch it:
 
 ```bash
-chmod +x SpeedGTK-2.1-x86_64.AppImage
-./SpeedGTK-2.1-x86_64.AppImage
+chmod +x SpeedGTK-2.0-x86_64.AppImage
+./SpeedGTK-2.0-x86_64.AppImage
 ```
 
 The AppImage does not include Ookla Speedtest CLI. The external `speedtest`

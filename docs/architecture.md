@@ -28,9 +28,11 @@ __main__ -> application -> ui -> speedtest/process
 - `ui/results_view.py` owns measurement state and the gauge/classic views.
 - `ui/server_picker.py` owns server-list state and manual-ID validation.
 - `ui/dialogs/` contains independent dialog presenters.
-- `ui/widgets/` contains reusable Cairo widgets. The gauge glow is isolated in
-  `gauge_glow.py` so its rendering can be tested independently from animation
-  and scale state.
+- `ui/widgets/` contains reusable Cairo widgets. `gauge.py` owns gauge state
+  and drawing composition, while `gauge_glow.py` isolates the colored glow.
+- `ui/widgets/gauge_animation/` separates the reversible scale timeline, pure
+  polar geometry and easing functions, and the final needle-reset controller.
+  Animation tuning therefore stays independent from Cairo rendering.
 
 ## Runtime flow
 
