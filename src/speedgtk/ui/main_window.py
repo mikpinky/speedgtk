@@ -13,7 +13,6 @@ from gi.repository import Adw, Gio, GLib, Gtk
 
 from ..config import (
     APP_NAME,
-    PROGRESS_HIDE_DELAY_MS,
     PROGRESS_INTERVAL_MS,
     RESULT_ACTION_TRANSITION_DURATION_MS,
 )
@@ -37,6 +36,7 @@ from .dialogs import (
     present_preferences,
     present_terms,
 )
+from .presentation import PingPresentation
 from .results_view import MeasurementsView, ResultDetails
 from .server_picker import ServerPicker
 from .widgets import PhaseProgress
@@ -59,8 +59,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._result_url = None
         self._auto_server = True
         self._has_run = False
-        self._progress_hide_source = None
         self._result_action_reveal_source = None
+        self._ping_presentation = PingPresentation(self._render_transfer_event)
 
         self._toasts = Adw.ToastOverlay()
         self.set_content(self._toasts)
@@ -330,6 +330,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             return
         if self._run is not None:
             self._set_phase("cancel", _("Cancelling…"))
+            self._ping_presentation.cancel()
             self._start_button.set_sensitive(False)
             self._run.cancel()
             return
@@ -371,12 +372,11 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             widget.set_sensitive(not running)
 
     def _reset_results(self):
-        self._cancel_progress_hide()
+        self._ping_presentation.cancel()
         self._last_error = None
         self._result_url = None
-        self._progress.set_fraction(0.0)
+        self._progress.reset()
         self._measurements.reset(_("Starting…"))
-        self._progress.set_phase("idle")
         self._result_details.reset()
         self._set_result_actions_visible(False)
 
@@ -445,37 +445,50 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         event_type = event.get("type")
 
         if event_type == "testStart":
+            self._ping_presentation.start()
             self._set_phase("ping", _("Test started…"))
             self._set_server_details(event.get("server"), event.get("isp"))
 
         elif event_type == "ping":
             data = event.get("ping", {})
             self._set_phase("ping", _("Measuring ping…"))
-            # Ignore ping progress: the bottom bar represents data transfer.
             self._measurements.show_latency(
                 "idle", data.get("latency"), data.get("jitter")
             )
+            if isinstance(data.get("latency"), (int, float)):
+                self._ping_presentation.note_ping_value()
 
         elif event_type in ("download", "upload"):
-            data = event.get(event_type, {})
-            is_download = event_type == "download"
-            # Change phase first so the needle can reset before the new value.
-            self._set_phase(event_type, _("Download…") if is_download else _("Upload…"))
-            self._set_progress(data.get("progress"))
-            bandwidth = data.get("bandwidth")
-            if isinstance(bandwidth, (int, float)):
-                self._measurements.show_speed(event_type, mbps(bandwidth))
-            self._measurements.show_latency(
-                event_type, loaded_latency(data.get("latency"))
-            )
+            presentation = getattr(self, "_ping_presentation", None)
+            if presentation is None or not presentation.defer_transfer(event):
+                SpeedGTKWindow._render_transfer_event(self, event)
 
         elif event_type == "result":
+            self._ping_presentation.flush()
             self._apply_result(event)
 
         elif event_type == "error" or (event_type == "log" and event.get("level") == "error"):
             # Retain the error until process completion to avoid later events
             # overwriting it.
             self._last_error = str(event.get("message") or event.get("error") or "")
+
+    def _render_transfer_event(self, event):
+        event_type = event.get("type")
+        if event_type not in ("download", "upload") or getattr(
+            self, "_closing", False
+        ):
+            return
+        data = event.get(event_type, {})
+        is_download = event_type == "download"
+        # Change phase first so the needle can reset before the new value.
+        self._set_phase(event_type, _("Download…") if is_download else _("Upload…"))
+        self._set_progress(data.get("progress"))
+        bandwidth = data.get("bandwidth")
+        if isinstance(bandwidth, (int, float)):
+            self._measurements.show_speed(event_type, mbps(bandwidth))
+        self._measurements.show_latency(
+            event_type, loaded_latency(data.get("latency"))
+        )
 
     def _apply_result(self, event):
         self._measurements.apply_result(event)
@@ -484,32 +497,11 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         url = event.get("result", {}).get("url")
         self._result_url = url if isinstance(url, str) and url else None
 
-        self._progress.set_fraction(1.0)
         self._set_phase("done", _("Completed"))
         if self._settings["keep_history"]:
             self._history.add(
                 history_entry_from_result(event, self._measurements.live)
             )
-        self._schedule_progress_hide()
-
-    def _schedule_progress_hide(self):
-        """Keep completed upload progress visible briefly."""
-        self._cancel_progress_hide()
-        self._progress_hide_source = GLib.timeout_add(
-            PROGRESS_HIDE_DELAY_MS, self._hide_finished_progress
-        )
-
-    def _cancel_progress_hide(self):
-        if self._progress_hide_source is not None:
-            GLib.source_remove(self._progress_hide_source)
-            self._progress_hide_source = None
-
-    def _hide_finished_progress(self):
-        self._progress_hide_source = None
-        # A newer run may own the progress bar by the time this timer fires.
-        if self._measurements.phase == "done":
-            self._progress.set_fraction(0.0)
-        return GLib.SOURCE_REMOVE
 
     def _set_server_details(self, server, isp):
         if self._auto_server:
@@ -524,12 +516,14 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._run = None
         if self._closing:
             return
+        ping_presentation = getattr(self, "_ping_presentation", None)
+        if ping_presentation is not None:
+            ping_presentation.cancel()
         self._has_run = True
         self._set_running(False)
 
         if cancelled:
             self._set_phase("idle", _("Test cancelled"))
-            self._progress.set_fraction(0.0)
             self._toast(_("Test cancelled"))
             self._set_result_actions_visible(True)
             return
@@ -573,8 +567,10 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def stop_processes(self):
         """Force every CLI subprocess owned by this window to exit."""
         self._closing = True
-        self._cancel_progress_hide()
         self._cancel_result_action_delay()
+        ping_presentation = getattr(self, "_ping_presentation", None)
+        if ping_presentation is not None:
+            ping_presentation.cancel()
         if self._servers_cancellable is not None:
             self._servers_cancellable.cancel()
             self._servers_cancellable = None

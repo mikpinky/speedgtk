@@ -134,6 +134,8 @@ class MeasurementsView(Gtk.Stack):
         if isinstance(latency, (int, float)):
             self._latencies[kind] = latency
             self._render_latency(kind, latency)
+            if kind == "idle" and self._phase == "ping":
+                self._gauge.set_ping_value(latency)
             _classic, _gauge, icon = self._latency_widgets(kind)
             icon.set_active(True)
         if isinstance(jitter, (int, float)):

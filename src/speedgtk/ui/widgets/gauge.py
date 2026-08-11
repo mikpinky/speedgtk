@@ -1,23 +1,27 @@
 """Animated Cairo speed gauge."""
 
 import math
-import sys
 
 import cairo
-from gi.repository import Adw, GObject, Gtk, Pango, PangoCairo
+from gi.repository import Adw, GObject, Gtk, Pango
 
 from ...formatting import format_number
-from ...i18n import _
 from ..theme import (
     draw_text,
     gradient_stops,
-    pango_layout,
     rgb_at,
     surface_rgb,
     text_rgba,
 )
-from .gauge_animation import GaugeScaleTransition, NeedleResetAnimation
+from .gauge_animation import (
+    GaugeScaleTransition,
+    NeedleResetAnimation,
+    PingReadoutAnimation,
+    PingToSpeedCrossfade,
+)
+from .gauge_face import GaugeFace
 from .gauge_glow import draw_inner_glow
+from .gauge_readout import GaugeReadout
 
 
 GAUGE_START_DEG = 135.0
@@ -29,7 +33,7 @@ GAUGE_SCALES = (
 )
 GAUGE_DEFAULT_SCALE = 1
 GAUGE_EXPANSION_THRESHOLD_MBPS = 960.0
-TRACK_DURATION_MS = 250
+TRACK_DURATION_MS = 500
 RESET_DURATION_MS = 600
 
 
@@ -55,12 +59,6 @@ class SpeedGauge(Gtk.DrawingArea):
     NEEDLE_HALF = 0.011
     HUB_OUTER = 0.028
     HUB_INNER = 0.013
-    VALUE_SIZE = 0.098
-    VALUE_OFFSET = 0.223
-    UNIT_SIZE = 0.048
-    UNIT_OFFSET = 0.335
-    VIGNETTE_DITHER_SIZE = 64
-
     # Optical label offsets measured in average label-character widths.
     STANDARD_TICK_OFFSETS = {
         0: (-0.354, 0.354),
@@ -92,12 +90,13 @@ class SpeedGauge(Gtk.DrawingArea):
         self._collapse_scale_after_reset = False
         self._scale_reverse_started = False
         self._needle_reset_midpoint = 0.0
+        self._ping_value = None
         self._scale_index = GAUGE_DEFAULT_SCALE
         self._use_accent = False
         self._auto_range = True
         self._measurement_decimals = 2
-        self._vignette_dither_surface = None
-        self._vignette_dither_key = None
+        self._face = GaugeFace()
+        self._readout = GaugeReadout(self)
 
         self.set_content_width(330)
         self.set_content_height(330)
@@ -113,6 +112,8 @@ class SpeedGauge(Gtk.DrawingArea):
         self._final_reset = NeedleResetAnimation(
             self, self._set_reset_value, self._on_reset_animation_done
         )
+        self._ping_readout = PingReadoutAnimation(self, self._set_ping_readout)
+        self._ping_to_speed = PingToSpeedCrossfade(self, self.queue_draw)
 
         self._scale_transition = GaugeScaleTransition(
             self, self.queue_draw, self._on_scale_collapsed
@@ -183,11 +184,40 @@ class SpeedGauge(Gtk.DrawingArea):
             self._measurement_decimals = decimals
             self.queue_draw()
 
+    def set_ping_value(self, latency):
+        """Update the central latency readout without moving the needle."""
+        if not isinstance(latency, (int, float)):
+            return
+        if self._ping_value is None:
+            self._ping_value = 0.0
+        self._ping_readout.animate_to(latency)
+
+    def _set_ping_readout(self, value):
+        self._ping_value = value
+        if self._phase == "ping":
+            self.queue_draw()
+
     def set_phase(self, phase):
         """Set the test phase, palette, and inter-phase needle transition."""
         if phase not in self.PHASES or phase == self._phase:
             return
         previous, self._phase = self._phase, phase
+
+        ping_to_speed = getattr(self, "_ping_to_speed", None)
+        if phase == "ping":
+            self._ping_value = None
+            self._ping_readout.reset()
+            if ping_to_speed is not None:
+                ping_to_speed.finish()
+        elif (
+            previous == "ping"
+            and phase == "download"
+            and ping_to_speed is not None
+        ):
+            self._ping_readout.pause()
+            ping_to_speed.start()
+        elif phase != "download" and ping_to_speed is not None:
+            ping_to_speed.finish()
 
         if phase == "idle":
             if previous == "cancel" and self._settling:
@@ -350,7 +380,7 @@ class SpeedGauge(Gtk.DrawingArea):
         cr.set_line_cap(cairo.LineCap.BUTT)
         cr.set_line_width(ring)
 
-        self._draw_vignette(cr, cx, cy, r_inner, base)
+        self._face.draw_vignette(cr, cx, cy, r_inner, base)
         self._draw_track(cr, cx, cy, r_mid, base)
         fraction = self._fraction(self._value)
         draw_inner_glow(
@@ -368,77 +398,20 @@ class SpeedGauge(Gtk.DrawingArea):
         self._draw_fill(cr, cx, cy, r_mid, stops)
         self._draw_ticks(cr, cx, cy, size, r_inner, base)
         self._draw_needle(cr, cx, cy, size, base)
-        self._draw_readout(cr, cx, cy, size, base, stops)
-
-    def _draw_vignette(self, cr, cx, cy, radius, base):
-        """Draw subtle dial depth with a radial gradient.
-
-        The curve becomes steeper near the edge to minimize visible gray bands
-        without per-pixel Python work during resize or layout animation.
-        """
-        gradient = cairo.RadialGradient(cx, cy, radius * 0.15, cx, cy, radius)
-        for position, alpha in (
-            (0.00, 0.000),
-            (0.28, 0.002),
-            (0.52, 0.008),
-            (0.72, 0.016),
-            (0.88, 0.026),
-            (1.00, 0.035),
-        ):
-            gradient.add_color_stop_rgba(position, *base, alpha)
-        cr.set_source(gradient)
-        cr.arc(cx, cy, radius, 0, 2 * math.pi)
-        cr.fill()
-        self._draw_vignette_dither(cr, cx, cy, radius, base)
-
-    def _draw_vignette_dither(self, cr, cx, cy, radius, base):
-        """Mask a small repeating dither texture over the vignette.
-
-        The texture is cached per theme color; Cairo repeats and masks it without
-        resize work proportional to the gauge area.
-        """
-        base_key = tuple(round(component, 4) for component in base)
-        if base_key != self._vignette_dither_key:
-            self._vignette_dither_surface = self._make_vignette_dither_surface(base)
-            self._vignette_dither_key = base_key
-
-        pattern = cairo.SurfacePattern(self._vignette_dither_surface)
-        pattern.set_extend(cairo.Extend.REPEAT)
-        pattern.set_filter(cairo.Filter.NEAREST)
-        alpha_mask = cairo.RadialGradient(cx, cy, radius * 0.15, cx, cy, radius)
-        for position, alpha in ((0.00, 0.0), (0.20, 1.0), (0.82, 1.0), (1.00, 0.0)):
-            alpha_mask.add_color_stop_rgba(position, 0.0, 0.0, 0.0, alpha)
-
-        cr.save()
-        cr.arc(cx, cy, radius, 0, 2 * math.pi)
-        cr.clip()
-        cr.set_source(pattern)
-        cr.mask(alpha_mask)
-        cr.restore()
-
-    def _make_vignette_dither_surface(self, base):
-        """Create a stable single-alpha noise texture."""
-        size = self.VIGNETTE_DITHER_SIZE
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
-        words = memoryview(surface.get_data()).cast("I")
-        stride_words = surface.get_stride() // 4
-        red, green, blue = (round(component) for component in base)
-
-        for y in range(size):
-            for x in range(size):
-                # A stable hash lights roughly half the pixels.
-                noise_word = (
-                    (x * 0x1F123BB5) ^ (y * 0x5F356495) ^ ((x + y) * 0x27D4EB2D)
-                )
-                if ((noise_word >> 16) & 0xFF) >= 128:
-                    continue
-                if sys.byteorder == "little":
-                    words[y * stride_words + x] = blue | (green << 8) | (red << 16) | (1 << 24)
-                else:
-                    words[y * stride_words + x] = 1 | (red << 8) | (green << 16) | (blue << 24)
-
-        surface.mark_dirty()
-        return surface
+        self._readout.draw(
+            cr,
+            cx,
+            cy,
+            size,
+            base,
+            stops,
+            self._value,
+            self._ping_value,
+            self._measurement_decimals,
+            self._phase,
+            self._color_phase,
+            self._ping_to_speed,
+        )
 
     def _draw_track(self, cr, cx, cy, radius, base):
         """Draw the inactive arc using a low-alpha text color."""
@@ -569,53 +542,3 @@ class SpeedGauge(Gtk.DrawingArea):
         cr.set_source_rgb(*surface_rgb(self))
         cr.arc(cx, cy, size * self.HUB_INNER, 0, 2 * math.pi)
         cr.fill()
-
-    def _draw_readout(self, cr, cx, cy, size, base, stops):
-        """Draw the large numeric readout and unit below the needle."""
-        draw_text(
-            self,
-            cr,
-            format_number(self._value, self._measurement_decimals),
-            cx,
-            cy + size * self.VALUE_OFFSET,
-            size * self.VALUE_SIZE,
-            (*base, 1.0),
-            weight=Pango.Weight.LIGHT,
-            tabular=True,
-        )
-        unit = _("Mbps")
-        unit_layout = pango_layout(self, cr, unit, size * self.UNIT_SIZE)
-        unit_width, unit_height = unit_layout.get_pixel_size()
-        marker_size = size * 0.044
-        marker_gap = size * 0.012
-        group_width = marker_size + marker_gap + unit_width
-        marker_x = cx - group_width / 2.0 + marker_size / 2.0
-        unit_y = cy + size * self.UNIT_OFFSET
-        self._draw_readout_marker(cr, marker_x, unit_y, size, stops)
-        cr.set_source_rgba(*base, 0.78)
-        cr.move_to(marker_x + marker_size / 2.0 + marker_gap, unit_y - unit_height / 2.0)
-        PangoCairo.show_layout(cr, unit_layout)
-
-    def _draw_readout_marker(self, cr, cx, cy, size, stops):
-        """Draw the colored marker identifying the active transfer direction."""
-        marker_size = size * 0.044
-        radius = marker_size * 0.42
-        color = rgb_at(stops, 0.55)
-        cr.save()
-        cr.new_path()
-        cr.set_source_rgb(*color)
-        cr.set_line_width(max(1.0, marker_size * 0.085))
-        cr.arc(cx, cy, radius, 0, 2 * math.pi)
-        cr.stroke()
-
-        direction = 1.0 if self._color_phase == "download" else -1.0
-        stem = marker_size * 0.20
-        head = marker_size * 0.13
-        cr.new_path()
-        cr.move_to(cx, cy - stem * direction)
-        cr.line_to(cx, cy + stem * direction)
-        cr.move_to(cx - head, cy + (stem - head) * direction)
-        cr.line_to(cx, cy + stem * direction)
-        cr.line_to(cx + head, cy + (stem - head) * direction)
-        cr.stroke()
-        cr.restore()

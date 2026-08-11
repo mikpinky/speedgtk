@@ -2,13 +2,14 @@ APP_ID := io.github.speedgtk.SpeedGTK
 APP_NAME := speedgtk
 PREFIX ?= /usr/local
 DESTDIR ?=
+PRECOMPILE ?= 0
 DATADIR := $(PREFIX)/share/$(APP_NAME)
 BINDIR := $(PREFIX)/bin
 APPLICATIONSDIR := $(PREFIX)/share/applications
 ICONDIR := $(PREFIX)/share/icons/hicolor/scalable/apps
 USER_CONFIG_DIR ?= $(or $(XDG_CONFIG_HOME),$(HOME)/.config)
 
-.PHONY: all install install-user uninstall uninstall-user check test run
+.PHONY: all install install-precompiled install-user uninstall uninstall-user check test run
 
 all:
 	@echo "Nothing to build: SpeedGTK is a Python application."
@@ -33,6 +34,13 @@ install: check
 	chmod 755 "$(DESTDIR)$(BINDIR)/$(APP_NAME)"
 	install -m 644 data/$(APP_ID).desktop "$(DESTDIR)$(APPLICATIONSDIR)/$(APP_ID).desktop"
 	install -m 644 data/icons/hicolor/scalable/apps/$(APP_ID).svg "$(DESTDIR)$(ICONDIR)/$(APP_ID).svg"
+	@if [ "$(PRECOMPILE)" = "1" ]; then \
+		python3 -m compileall -f -q "$(DESTDIR)$(DATADIR)/speedgtk"; \
+		echo "Precompiled Python modules in $(DESTDIR)$(DATADIR)/speedgtk"; \
+	fi
+
+install-precompiled:
+	$(MAKE) install PRECOMPILE=1
 
 install-user:
 	$(MAKE) install PREFIX="$(HOME)/.local"

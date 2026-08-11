@@ -70,7 +70,6 @@ class ProcessLifecycleTests(unittest.TestCase):
             _servers_run=servers_run,
             _run=speedtest_run,
             _servers_cancellable=cancellable,
-            _cancel_progress_hide=lambda: cancelled_timers.append("progress"),
             _cancel_result_action_delay=lambda: cancelled_timers.append("result"),
         )
 
@@ -84,7 +83,7 @@ class ProcessLifecycleTests(unittest.TestCase):
         self.assertIsNone(window._version_run)
         self.assertIsNone(window._servers_run)
         self.assertIsNone(window._run)
-        self.assertEqual(cancelled_timers, ["progress", "result"])
+        self.assertEqual(cancelled_timers, ["result"])
 
     def test_close_request_runs_the_same_shutdown_path(self):
         calls = []

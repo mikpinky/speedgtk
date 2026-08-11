@@ -28,8 +28,13 @@ __main__ -> application -> ui -> speedtest/process
 - `ui/results_view.py` owns measurement state and the gauge/classic views.
 - `ui/server_picker.py` owns server-list state and manual-ID validation.
 - `ui/dialogs/` contains independent dialog presenters.
-- `ui/widgets/` contains reusable Cairo widgets. `gauge.py` owns gauge state
-  and drawing composition, while `gauge_glow.py` isolates the colored glow.
+- `ui/presentation/` owns visual timing that may intentionally lag behind the
+  provider event stream without delaying or buffering the actual speed test.
+- `ui/widgets/` contains reusable Cairo widgets. `gauge.py` composes gauge
+  state, ticks and needle; `gauge_face.py`, `gauge_glow.py`, and
+  `gauge_readout.py` isolate its background, glow, and central readout.
+- `progress.py` only renders the bottom bar; `progress_timeline.py` smooths
+  provider samples and sequences phase completion and fades.
 - `ui/widgets/gauge_animation/` separates the reversible scale timeline, pure
   polar geometry and easing functions, and the final needle-reset controller.
   Animation tuning therefore stays independent from Cairo rendering.

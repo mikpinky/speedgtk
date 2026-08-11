@@ -13,6 +13,11 @@ STOPS_UPLOAD = (
     (0.55, (0.66, 0.36, 0.95)),
     (1.0, (0.85, 0.47, 0.98)),
 )
+STOPS_PING = (
+    (0.0, (1.00, 0.68, 0.02)),
+    (0.55, (1.00, 0.82, 0.12)),
+    (1.0, (1.00, 0.93, 0.38)),
+)
 
 
 def text_rgba(widget):
@@ -48,6 +53,8 @@ def shade(rgb, factor):
 
 
 def gradient_stops(widget, phase, use_accent):
+    if phase == "ping":
+        return STOPS_PING
     if use_accent:
         base = accent_rgb(widget)
         return ((0.0, shade(base, 0.82)), (0.55, base), (1.0, shade(base, 0.92)))

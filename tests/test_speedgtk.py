@@ -223,7 +223,6 @@ class EventHandlingTests(unittest.TestCase):
 
         self.assertIsNone(window._run)
         self.assertTrue(window._has_run)
-        self.assertIn(("progress", 0.0), calls)
         self.assertIn(("result-actions", True), calls)
 
     def test_download_event_changes_phase_before_rendering_speed(self):

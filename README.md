@@ -95,6 +95,13 @@ sudo make install
 
 Launch **SpeedGTK** from the application menu or run `speedgtk`.
 
+An optional precompiled installation is also available, although its startup
+improvement is usually barely noticeable:
+
+```bash
+sudo make install-precompiled
+```
+
 To update an existing installation, pull the latest changes and run the same
 install command again. To uninstall it:
 

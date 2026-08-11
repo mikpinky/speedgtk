@@ -2,9 +2,34 @@
 
 import math
 
+import cairo
 from gi.repository import Gtk
 
 from ..theme import gradient_stops, rgb_at, text_rgba
+
+
+ICON_STROKE = 0.085
+MARK_HALF_WIDTH = 0.23
+MARK_HALF_GAP = 0.07
+MARK_RADIUS = math.hypot(MARK_HALF_WIDTH, MARK_HALF_GAP)
+TRANSFER_MARK_RADIUS = 0.20
+
+
+def _draw_transfer_mark(cr, cx, cy, size, direction):
+    """Draw a radially balanced download or upload arrow."""
+    mark_radius = size * TRANSFER_MARK_RADIUS
+    tip_y = cy + mark_radius * direction
+
+    cr.save()
+    cr.set_line_cap(cairo.LineCap.ROUND)
+    cr.set_line_join(cairo.LineJoin.ROUND)
+    cr.move_to(cx, cy - mark_radius * direction)
+    cr.line_to(cx, tip_y)
+    cr.move_to(cx - mark_radius, cy)
+    cr.line_to(cx, tip_y)
+    cr.line_to(cx + mark_radius, cy)
+    cr.stroke()
+    cr.restore()
 
 
 class PhaseIcon(Gtk.DrawingArea):
@@ -48,28 +73,20 @@ class PhaseIcon(Gtk.DrawingArea):
             color = (text.red, text.green, text.blue, 0.35)
 
         cr.set_source_rgba(*color)
-        cr.set_line_width(max(1.0, size * 0.085))
+        cr.set_line_width(max(1.0, size * ICON_STROKE))
         radius = size * 0.42
         cr.arc(cx, cy, radius, 0, 2 * math.pi)
         cr.stroke()
 
         direction = 1.0 if self._phase == "download" else -1.0
-        stem = size * 0.20
-        head = size * 0.13
-        cr.move_to(cx, cy - stem * direction)
-        cr.line_to(cx, cy + stem * direction)
-        cr.stroke()
-        cr.move_to(cx - head, cy + (stem - head) * direction)
-        cr.line_to(cx, cy + stem * direction)
-        cr.line_to(cx + head, cy + (stem - head) * direction)
-        cr.stroke()
+        _draw_transfer_mark(cr, cx, cy, size, direction)
 
 
 class LatencyIcon(Gtk.DrawingArea):
     """Idle, download, or upload latency indicator.
 
-    Idle ping uses horizontal yellow arrows. Loaded latency uses the matching
-    transfer color and remains dimmed until a measurement arrives.
+    Idle ping uses a compact yellow latency mark. Loaded latency uses the
+    matching transfer color and remains dimmed until a measurement arrives.
     """
 
     __gtype_name__ = "LatencyIcon"
@@ -111,30 +128,38 @@ class LatencyIcon(Gtk.DrawingArea):
             color = (text.red, text.green, text.blue, 0.35)
 
         cr.set_source_rgba(*color)
-        cr.set_line_width(max(1.0, size * 0.085))
+        cr.set_line_width(max(1.0, size * ICON_STROKE))
         radius = size * 0.42
         cr.arc(cx, cy, radius, 0, 2 * math.pi)
         cr.stroke()
 
-        stem = size * 0.20
-        head = size * 0.13
         if self._phase == "idle":
-            cr.move_to(cx - stem, cy)
-            cr.line_to(cx + stem, cy)
-            cr.move_to(cx - stem + head, cy - head)
-            cr.line_to(cx - stem, cy)
-            cr.line_to(cx - stem + head, cy + head)
-            cr.move_to(cx + stem - head, cy - head)
-            cr.line_to(cx + stem, cy)
-            cr.line_to(cx + stem - head, cy + head)
-        else:
-            direction = 1.0 if self._phase == "download" else -1.0
-            cr.move_to(cx, cy - stem * direction)
-            cr.line_to(cx, cy + stem * direction)
-            cr.move_to(cx - head, cy + (stem - head) * direction)
-            cr.line_to(cx, cy + stem * direction)
-            cr.line_to(cx + head, cy + (stem - head) * direction)
+            self._draw_idle_mark(cr, cx, cy, size)
+            return
+
+        direction = 1.0 if self._phase == "download" else -1.0
+        _draw_transfer_mark(cr, cx, cy, size, direction)
+
+    @staticmethod
+    def _draw_idle_mark(cr, cx, cy, size):
+        """Draw the two-piece angular latency mark used for idle ping."""
+        half_width = size * MARK_HALF_WIDTH
+        half_gap = size * MARK_HALF_GAP
+        radial_extent = size * MARK_RADIUS
+
+        cr.save()
+        cr.set_line_cap(cairo.LineCap.ROUND)
+        cr.set_line_join(cairo.LineJoin.ROUND)
+
+        cr.move_to(cx, cy - radial_extent)
+        cr.line_to(cx - half_width, cy - half_gap)
+        cr.line_to(cx + half_width, cy - half_gap)
+
+        cr.move_to(cx - half_width, cy + half_gap)
+        cr.line_to(cx + half_width, cy + half_gap)
+        cr.line_to(cx, cy + radial_extent)
         cr.stroke()
+        cr.restore()
 
 
 class DetailIcon(Gtk.DrawingArea):
