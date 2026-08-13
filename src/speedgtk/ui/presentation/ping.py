@@ -2,14 +2,65 @@
 
 import math
 from collections import deque
+from dataclasses import dataclass
 
 from gi.repository import GLib
 
 
 PING_PHASE_MINIMUM_MS = 1800
 PING_RESULT_HOLD_MS = 350
-TRANSFER_REPLAY_INTERVAL_MS = 60
+CATCH_UP_INTERVAL_MS = 60
 MAX_BUFFERED_TRANSFERS = 64
+RAMP_STABILITY_SAMPLES = 4
+RAMP_STABILITY_RATIO = 0.90
+RAMP_MINIMUM_MS = 450
+RAMP_MAXIMUM_MS = 1200
+
+
+@dataclass(frozen=True)
+class TransferSample:
+    """A provider event with the timing policy chosen when it arrived."""
+
+    event: dict
+    received_at: int
+    preserve_timing: bool
+
+
+class TransferRamp:
+    """Identify the initial download ramp from a short bandwidth window."""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self._started_at = None
+        self._bandwidths = deque(maxlen=RAMP_STABILITY_SAMPLES)
+        self._complete = False
+
+    def preserve_timing(self, event, received_at):
+        if self._complete or event.get("type") != "download":
+            self._complete = True
+            return False
+
+        if self._started_at is None:
+            self._started_at = received_at
+        bandwidth = event.get("download", {}).get("bandwidth")
+        if isinstance(bandwidth, (int, float)) and bandwidth > 0:
+            self._bandwidths.append(float(bandwidth))
+
+        elapsed = received_at - self._started_at
+        preserve = True
+        if elapsed >= RAMP_MAXIMUM_MS:
+            self._complete = True
+        elif elapsed >= RAMP_MINIMUM_MS and self._is_stable():
+            self._complete = True
+        return preserve
+
+    def _is_stable(self):
+        if len(self._bandwidths) < RAMP_STABILITY_SAMPLES:
+            return False
+        fastest = max(self._bandwidths)
+        return fastest > 0 and min(self._bandwidths) / fastest >= RAMP_STABILITY_RATIO
 
 
 class PingPresentation:
@@ -19,18 +70,16 @@ class PingPresentation:
         self._release_transfer = release_transfer
         self._active = False
         self._replaying = False
-        self._started_at = 0
         self._readable_until = 0
         self._buffered_transfers = deque(maxlen=MAX_BUFFERED_TRANSFERS)
-        self._latest_live_transfer = None
+        self._ramp = TransferRamp()
         self._release_source = None
         self._replay_source = None
 
     def start(self):
         self.cancel()
         self._active = True
-        self._started_at = _now_ms()
-        self._readable_until = self._started_at + PING_PHASE_MINIMUM_MS
+        self._readable_until = _now_ms() + PING_PHASE_MINIMUM_MS
 
     def note_ping_value(self):
         if self._active:
@@ -43,28 +92,36 @@ class PingPresentation:
                 self._schedule_release()
 
     def defer_transfer(self, event):
-        """Keep the latest transfer sample until the ping hold has elapsed."""
+        """Buffer a timed transfer sample until the ping hold has elapsed."""
         if not self._active:
             return False
+
+        received_at = _now_ms()
+        self._buffered_transfers.append(
+            TransferSample(
+                event,
+                received_at,
+                self._ramp.preserve_timing(event, received_at),
+            )
+        )
         if self._replaying:
-            self._latest_live_transfer = event
             return True
 
-        remaining = self._readable_until - _now_ms()
+        remaining = self._readable_until - received_at
         if remaining <= 0:
-            self._buffered_transfers.append(event)
             self._start_replay()
             return True
-        self._buffered_transfers.append(event)
         if self._release_source is None:
             self._schedule_release()
         return True
 
     def flush(self):
         """Render a buffered transfer immediately before a final result."""
-        event = self._latest_live_transfer
-        if event is None and self._buffered_transfers:
-            event = self._buffered_transfers[-1]
+        event = (
+            self._buffered_transfers[-1].event
+            if self._buffered_transfers
+            else None
+        )
         self.cancel()
         if event is not None:
             self._release_transfer(event)
@@ -79,7 +136,7 @@ class PingPresentation:
         self._active = False
         self._replaying = False
         self._buffered_transfers.clear()
-        self._latest_live_transfer = None
+        self._ramp.reset()
 
     def _on_release(self):
         self._release_source = None
@@ -110,22 +167,26 @@ class PingPresentation:
         if not self._active:
             return GLib.SOURCE_REMOVE
 
+        released = self._buffered_transfers.popleft()
+        self._release_transfer(released.event)
         if self._buffered_transfers:
-            self._release_transfer(self._buffered_transfers.popleft())
-        if self._buffered_transfers:
+            delay = _replay_delay(released, self._buffered_transfers[0])
             self._replay_source = GLib.timeout_add(
-                TRANSFER_REPLAY_INTERVAL_MS, self._release_next_transfer
+                delay, self._release_next_transfer
             )
             return GLib.SOURCE_REMOVE
 
-        latest = self._latest_live_transfer
-        self._latest_live_transfer = None
         self._active = False
         self._replaying = False
-        if latest is not None:
-            self._release_transfer(latest)
         return GLib.SOURCE_REMOVE
 
 
 def _now_ms():
     return GLib.get_monotonic_time() // 1000
+
+
+def _replay_delay(previous, following):
+    source_delay = max(1, following.received_at - previous.received_at)
+    if following.preserve_timing:
+        return source_delay
+    return min(source_delay, CATCH_UP_INTERVAL_MS)

@@ -29,7 +29,9 @@ __main__ -> application -> ui -> speedtest/process
 - `ui/server_picker.py` owns server-list state and manual-ID validation.
 - `ui/dialogs/` contains independent dialog presenters.
 - `ui/presentation/` owns visual timing that may intentionally lag behind the
-  provider event stream without delaying or buffering the actual speed test.
+  provider event stream without delaying the actual speed test. The initial
+  download ramp preserves provider timing; stable samples replay faster only
+  while the presentation catches up to the live stream.
 - `ui/widgets/` contains reusable Cairo widgets. `gauge.py` composes gauge
   state, ticks and needle; `gauge_face.py`, `gauge_glow.py`, and
   `gauge_readout.py` isolate its background, glow, and central readout.
