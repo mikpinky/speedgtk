@@ -20,21 +20,26 @@ __main__ -> application -> ui -> speedtest/process
 - `storage/` owns the JSON settings and history files.
 - `speedtest/process.py` owns provider-neutral Gio subprocess management.
 - `speedtest/providers/ookla/` owns the active Ookla CLI adapter, including
-  constants, JSONL parsing, error handling, and the streaming run lifecycle.
+  constants, JSONL parsing, error handling, the streaming run lifecycle, and
+  the optional isolated directory client for worldwide search and exact
+  server-ID resolution.
 - `speedtest/providers/librespeed/` reserves the boundary for a future
   LibreSpeed adapter. It intentionally contains no implementation yet, so a
   later change can choose between direct HTTP and `librespeed-cli` integration.
 - `ui/main_window.py` coordinates the current test and top-level navigation.
 - `ui/results_view.py` owns measurement state and the gauge/classic views.
-- `ui/server_picker.py` owns server-list state and manual-ID validation.
+- `ui/server_picker.py` owns server-list state and selection precedence;
+  `ui/dialogs/server_selector.py` owns the advanced selector interface while
+  `ui/dialogs/server_id.py` isolates numeric input and remote verification.
 - `ui/dialogs/` contains independent dialog presenters.
 - `ui/presentation/` owns visual timing that may intentionally lag behind the
   provider event stream without delaying the actual speed test. The initial
   download ramp preserves provider timing; stable samples replay faster only
   while the presentation catches up to the live stream.
-- `ui/widgets/` contains reusable Cairo widgets. `gauge.py` composes gauge
-  state, ticks and needle; `gauge_face.py`, `gauge_glow.py`, and
-  `gauge_readout.py` isolate its background, glow, and central readout.
+- `ui/widgets/` contains reusable visual components. `server_context.py`
+  animates the handoff between server selection and active-test metadata;
+  `gauge.py` composes gauge state, ticks and needle while `gauge_face.py`,
+  `gauge_glow.py`, and `gauge_readout.py` isolate its drawing layers.
 - `progress.py` only renders the bottom bar; `progress_timeline.py` smooths
   provider samples and sequences phase completion and fades.
 - `ui/widgets/gauge_animation/` separates the reversible scale timeline, pure
@@ -45,11 +50,15 @@ __main__ -> application -> ui -> speedtest/process
 
 1. `SpeedGTKApplication` creates a `SpeedGTKWindow` with shared settings and
    history stores.
-2. The window validates the official Ookla CLI and loads nearby servers.
-3. `OoklaRun` reads JSONL events asynchronously on the GLib main loop.
-4. The window coordinates each event while `MeasurementsView` renders values
+2. The window validates the official Ookla CLI and loads nearby servers. The
+   optional advanced selector can also query Speedtest.net by place/provider
+   or resolve an exact numeric server ID without blocking the GTK main loop.
+3. The selector keeps its query, results, and verified-ID state within the UI
+   session; only the chosen ID is passed to the external CLI.
+4. `OoklaRun` reads JSONL events asynchronously on the GLib main loop.
+5. The window coordinates each event while `MeasurementsView` renders values
    and `ResultDetails` renders server and ISP metadata.
-5. A successful final event is mapped to the stable history schema by the
+6. A successful final event is mapped to the stable history schema by the
    pure domain layer before being persisted.
 
 ## Compatibility rules
@@ -61,6 +70,8 @@ __main__ -> application -> ui -> speedtest/process
   application shutdown.
 - Provider adapters own parsing and emit the application event shape consumed
   by the UI; provider-specific parsing details stay inside their package.
+- Directory searches use anonymous requests without cookies or stored tokens;
+  response fields related to client identity or authentication are discarded.
 - Pass Ookla acceptance flags only after explicit user consent.
 - Keep custom drawing inside `ui/widgets`; process and domain code must not
   depend on GTK widgets.

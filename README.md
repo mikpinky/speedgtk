@@ -16,7 +16,7 @@ GNOME application.
 - Curated animations and icons for a sleek interface.
 - Support for a simpler, classic interface.
 - Idle, download and upload latency, plus jitter and packet loss.
-- Server selection and a manual server ID.
+- Advanced server selection with worldwide search and verified custom IDs.
 - Local history with sorting by date, download, upload, ping or weighted
   overall result.
 - Light, dark and system theme options; follows the GNOME accent color when

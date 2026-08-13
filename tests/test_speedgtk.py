@@ -202,6 +202,36 @@ class HistoryRankingTests(unittest.TestCase):
 
 
 class EventHandlingTests(unittest.TestCase):
+    def test_cancel_starts_the_reverse_server_context_animation_immediately(self):
+        calls = []
+        window = types.SimpleNamespace(
+            _settings={"ookla_terms_accepted": True},
+            _run=types.SimpleNamespace(cancel=lambda: calls.append("cancel-run")),
+            _set_phase=lambda phase, text: calls.append(phase),
+            _ping_presentation=types.SimpleNamespace(
+                cancel=lambda: calls.append("cancel-presentation")
+            ),
+            _server_context=types.SimpleNamespace(
+                show_selector=lambda: calls.append("selector")
+            ),
+            _start_button=types.SimpleNamespace(
+                set_sensitive=lambda sensitive: calls.append(("sensitive", sensitive))
+            ),
+        )
+
+        speedgtk.SpeedGTKWindow._on_start_clicked(window, None)
+
+        self.assertEqual(
+            calls,
+            [
+                "cancel",
+                "cancel-presentation",
+                "selector",
+                ("sensitive", False),
+                "cancel-run",
+            ],
+        )
+
     def test_cancelled_run_reveals_the_clear_action(self):
         calls = []
         window = types.SimpleNamespace(
@@ -213,9 +243,11 @@ class EventHandlingTests(unittest.TestCase):
             ),
             _set_running=lambda running: calls.append(("running", running)),
             _set_phase=lambda phase, text: calls.append(("phase", phase)),
-            _toast=lambda message: calls.append(("toast", message)),
             _set_result_actions_visible=lambda visible: calls.append(
                 ("result-actions", visible)
+            ),
+            _server_context=types.SimpleNamespace(
+                show_selector=lambda: calls.append(("server-context", "selector"))
             ),
         )
 
@@ -223,7 +255,46 @@ class EventHandlingTests(unittest.TestCase):
 
         self.assertIsNone(window._run)
         self.assertTrue(window._has_run)
+        self.assertIn(("server-context", "selector"), calls)
         self.assertIn(("result-actions", True), calls)
+
+    def test_clear_result_restores_the_server_selector(self):
+        calls = []
+        window = types.SimpleNamespace(
+            _run=None,
+            _has_run=True,
+            _reset_results=lambda: calls.append("reset"),
+            _server_context=types.SimpleNamespace(
+                show_selector=lambda: calls.append("selector")
+            ),
+            _set_phase=lambda phase, text: calls.append(phase),
+            _set_running=lambda running: calls.append(running),
+        )
+
+        speedgtk.SpeedGTKWindow._on_clear_result_clicked(window, None)
+
+        self.assertFalse(window._has_run)
+        self.assertEqual(calls, ["reset", "selector", "idle", False])
+
+    def test_server_metadata_replaces_the_selector(self):
+        calls = []
+        window = types.SimpleNamespace(
+            _auto_server=False,
+            _result_details=types.SimpleNamespace(
+                set_details=lambda server, isp: bool(server or isp)
+            ),
+            _server_context=types.SimpleNamespace(
+                show_details=lambda: calls.append("details")
+            ),
+        )
+
+        speedgtk.SpeedGTKWindow._set_server_details(
+            window,
+            {"id": 42, "name": "Example"},
+            "Example ISP",
+        )
+
+        self.assertEqual(calls, ["details"])
 
     def test_download_event_changes_phase_before_rendering_speed(self):
         calls = []

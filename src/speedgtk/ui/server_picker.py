@@ -1,8 +1,10 @@
-"""Server selection widget for automatic, nearby, and manual choices."""
+"""Server selection widget for automatic, nearby, and advanced choices."""
 
 from gi.repository import Adw, Gio, GObject, Gtk, Pango
 
 from ..i18n import _
+from .dialogs.server_id import ServerIdSession
+from .dialogs.server_selector import ServerSearchSession, present_server_selector
 
 
 def resolve_server_id(manual_text, selected_server_id):
@@ -22,12 +24,20 @@ class ServerItem(GObject.Object):
     title = GObject.Property(type=str, default="")
     subtitle = GObject.Property(type=str, default="")
 
-    def __init__(self, label, title, subtitle="", server_id=None):
+    def __init__(
+        self,
+        label,
+        title,
+        subtitle="",
+        server_id=None,
+        advanced=False,
+    ):
         super().__init__()
         self.props.label = label
         self.props.title = title
         self.props.subtitle = subtitle
         self.server_id = server_id
+        self.advanced = advanced
 
 
 class ServerPicker(Adw.PreferencesGroup):
@@ -37,6 +47,13 @@ class ServerPicker(Adw.PreferencesGroup):
         super().__init__()
         self._settings = settings
         self._updating = False
+        self._advanced_server_id = None
+        self._advanced_label = None
+        self._advanced_subtitle = None
+        self._advanced_source = None
+        self._id_session = ServerIdSession()
+        self._search_session = ServerSearchSession()
+        self._regular_server_id = None
         self._store = Gio.ListStore.new(ServerItem)
         self._row = Adw.ComboRow(title=_("Server"))
         self._row.set_expression(Gtk.PropertyExpression.new(ServerItem, None, "label"))
@@ -45,10 +62,11 @@ class ServerPicker(Adw.PreferencesGroup):
         self._row.connect("notify::selected", self._on_server_selected)
         self.add(self._row)
 
-        self._manual_row = Adw.EntryRow(title=_("Manual server ID"))
-        self._manual_row.set_input_purpose(Gtk.InputPurpose.DIGITS)
-        self._manual_row.connect("changed", self._on_manual_changed)
-        self.add(self._manual_row)
+        self._advanced_row = Adw.ActionRow(title=_("Advanced server selector"))
+        self._advanced_row.set_activatable(True)
+        self._advanced_row.add_suffix(Gtk.Image(icon_name="go-next-symbolic"))
+        self._advanced_row.connect("activated", self._open_advanced_selector)
+        self.add(self._advanced_row)
         self.set_servers(())
 
     @staticmethod
@@ -110,7 +128,7 @@ class ServerPicker(Adw.PreferencesGroup):
                         server_id=server.get("id"),
                     )
                 )
-            self._row.set_selected(0)
+            self._restore_selection()
         finally:
             self._updating = False
         self.refresh_subtitle()
@@ -150,20 +168,30 @@ class ServerPicker(Adw.PreferencesGroup):
     def _on_server_selected(self, *_args):
         if self._updating:
             return
-        if self._manual_row.get_text().strip():
-            self._manual_row.set_text("")
-        else:
-            self.refresh_subtitle()
-
-    def _on_manual_changed(self, *_args):
+        item = self._selected_item()
+        if item is None or item.advanced:
+            return
+        self._regular_server_id = item.server_id
+        if self._advanced_server_id is not None:
+            self._advanced_server_id = None
+            self._advanced_label = None
+            self._advanced_subtitle = None
+            self._advanced_source = None
+            self._remove_advanced_item()
         self.refresh_subtitle()
 
     def refresh_subtitle(self):
-        if self._manual_row.get_text().strip():
-            self._row.set_subtitle(_("Ignored: a manual ID is set"))
-            return
-        item = self._selected_item()
-        self._row.set_subtitle(item.props.subtitle if item is not None else "")
+        if self._advanced_server_id is not None:
+            self._row.set_subtitle(self._advanced_subtitle or "")
+            self._advanced_row.set_subtitle(
+                _("Selected: {server}").format(server=self._advanced_label)
+            )
+        else:
+            item = self._selected_item()
+            self._row.set_subtitle(item.props.subtitle if item is not None else "")
+            self._advanced_row.set_subtitle(
+                _("Worldwide search or custom server ID")
+            )
 
     def _selected_item(self):
         index = self._row.get_selected()
@@ -174,4 +202,78 @@ class ServerPicker(Adw.PreferencesGroup):
     def resolve_server_id(self):
         item = self._selected_item()
         selected_server_id = item.server_id if item is not None else None
-        return resolve_server_id(self._manual_row.get_text(), selected_server_id)
+        return resolve_server_id(
+            self._advanced_server_id or "",
+            selected_server_id,
+        )
+
+    def _open_advanced_selector(self, _row):
+        present_server_selector(
+            self.get_root(),
+            self._advanced_server_id,
+            self._advanced_source,
+            self._id_session,
+            self._search_session,
+            self._set_advanced_server,
+        )
+
+    def _set_advanced_server(self, server_id, label, subtitle, source):
+        if self._advanced_server_id is None:
+            item = self._selected_item()
+            if item is not None and not item.advanced:
+                self._regular_server_id = item.server_id
+        self._advanced_server_id = str(server_id) if server_id is not None else None
+        self._advanced_label = label
+        self._advanced_subtitle = subtitle
+        self._advanced_source = source
+        self._sync_advanced_item()
+        self.refresh_subtitle()
+
+    def _sync_advanced_item(self):
+        self._updating = True
+        try:
+            self._remove_advanced_item()
+            if self._advanced_server_id is not None:
+                self._store.append(
+                    ServerItem(
+                        label=self._advanced_label,
+                        title=self._advanced_label,
+                        subtitle=self._advanced_subtitle or "",
+                        server_id=self._advanced_server_id,
+                        advanced=True,
+                    )
+                )
+                self._row.set_selected(self._store.get_n_items() - 1)
+            else:
+                self._select_regular_server()
+        finally:
+            self._updating = False
+
+    def _remove_advanced_item(self):
+        for index in range(self._store.get_n_items() - 1, -1, -1):
+            if self._store.get_item(index).advanced:
+                self._store.remove(index)
+
+    def _restore_selection(self):
+        if self._advanced_server_id is not None:
+            self._store.append(
+                ServerItem(
+                    label=self._advanced_label,
+                    title=self._advanced_label,
+                    subtitle=self._advanced_subtitle or "",
+                    server_id=self._advanced_server_id,
+                    advanced=True,
+                )
+            )
+            self._row.set_selected(self._store.get_n_items() - 1)
+        else:
+            self._select_regular_server()
+
+    def _select_regular_server(self):
+        for index in range(self._store.get_n_items()):
+            item = self._store.get_item(index)
+            if not item.advanced and item.server_id == self._regular_server_id:
+                self._row.set_selected(index)
+                return
+        self._regular_server_id = None
+        self._row.set_selected(0)

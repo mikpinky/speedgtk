@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SpeedGTK 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-10 09:33+0200\n"
+"POT-Creation-Date: 2026-08-13 13:35+0200\n"
 "PO-Revision-Date: 2026-08-08 12:00+0000\n"
 "Last-Translator: SpeedGTK contributors\n"
 "Language-Team: French\n"
@@ -171,6 +171,40 @@ msgstr ""
 msgid "speedtest reported an unspecified error"
 msgstr "speedtest a signalé une erreur non précisée"
 
+#: src/speedgtk/speedtest/providers/ookla/search.py:50
+#, python-brace-format
+msgid "{distance} km away"
+msgstr "à {distance} km"
+
+#: src/speedgtk/speedtest/providers/ookla/search.py:104
+msgid "Worldwide search requires the system's libsoup 3 library."
+msgstr "La recherche mondiale nécessite la bibliothèque système libsoup 3."
+
+#: src/speedgtk/speedtest/providers/ookla/search.py:121
+msgid "HTTP error"
+msgstr "Erreur HTTP"
+
+#: src/speedgtk/speedtest/providers/ookla/search.py:123
+#, python-brace-format
+msgid "Speedtest.net returned {status}: {reason}"
+msgstr "Speedtest.net a renvoyé {status} : {reason}"
+
+#: src/speedgtk/speedtest/providers/ookla/search.py:131
+msgid "The server response was unexpectedly large."
+msgstr "La réponse du serveur était anormalement volumineuse."
+
+#: src/speedgtk/speedtest/providers/ookla/search.py:194
+msgid "Speedtest.net returned an invalid server list."
+msgstr "Speedtest.net a renvoyé une liste de serveurs non valide."
+
+#: src/speedgtk/speedtest/providers/ookla/search.py:215
+msgid "Unknown provider"
+msgstr "Fournisseur inconnu"
+
+#: src/speedgtk/speedtest/providers/ookla/search.py:216
+msgid "Unknown location"
+msgstr "Emplacement inconnu"
+
 #: src/speedgtk/ui/dialogs/about.py:18
 msgid "A GTK 4 interface for the official Ookla Speedtest CLI."
 msgstr ""
@@ -227,8 +261,10 @@ msgstr "Tests enregistrés : {count} — au maximum {limit}"
 msgid "View this result online"
 msgstr "Voir ce résultat en ligne"
 
-#: src/speedgtk/ui/dialogs/history.py:117 src/speedgtk/ui/results_view.py:176
-#: src/speedgtk/ui/results_view.py:274 src/speedgtk/ui/widgets/gauge.py:541
+#: src/speedgtk/ui/dialogs/history.py:117 src/speedgtk/ui/results_view.py:178
+#: src/speedgtk/ui/results_view.py:276
+#: src/speedgtk/ui/widgets/gauge_readout.py:65
+#: src/speedgtk/ui/widgets/gauge_readout.py:80
 msgid "Mbps"
 msgstr "Mb/s"
 
@@ -259,7 +295,7 @@ msgstr ""
 "Les résultats enregistrés sur cet ordinateur seront supprimés. Les tests "
 "restent consultables via leurs liens speedtest.net."
 
-#: src/speedgtk/ui/dialogs/history.py:145 src/speedgtk/ui/main_window.py:363
+#: src/speedgtk/ui/dialogs/history.py:145 src/speedgtk/ui/main_window.py:367
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -304,7 +340,7 @@ msgid "Instead of Ookla's teal and violet"
 msgstr "À la place du turquoise et du violet d'Ookla"
 
 #: src/speedgtk/ui/dialogs/preferences.py:56
-#: src/speedgtk/ui/results_view.py:325
+#: src/speedgtk/ui/results_view.py:327
 msgid "Measurements"
 msgstr "Mesures"
 
@@ -362,6 +398,102 @@ msgstr "La langue sera appliquée au prochain démarrage"
 #: src/speedgtk/ui/dialogs/preferences.py:153
 msgid "Theme"
 msgstr "Thème"
+
+#: src/speedgtk/ui/dialogs/server_id.py:33
+msgid "Selected server"
+msgstr "Serveur sélectionné"
+
+#: src/speedgtk/ui/dialogs/server_id.py:91
+msgid "Server ID"
+msgstr "ID du serveur"
+
+#: src/speedgtk/ui/dialogs/server_id.py:102
+msgid "Clear server ID"
+msgstr "Effacer l’ID du serveur"
+
+#: src/speedgtk/ui/dialogs/server_id.py:168
+msgid "Invalid server ID"
+msgstr "ID de serveur non valide"
+
+#: src/speedgtk/ui/dialogs/server_id.py:169
+msgid "Enter exactly 4 or 5 digits."
+msgstr "Saisissez exactement 4 ou 5 chiffres."
+
+#: src/speedgtk/ui/dialogs/server_id.py:197
+msgid "Verification unavailable"
+msgstr "Vérification indisponible"
+
+#: src/speedgtk/ui/dialogs/server_id.py:202
+msgid "Server ID not found"
+msgstr "ID de serveur introuvable"
+
+#: src/speedgtk/ui/dialogs/server_id.py:203
+msgid "Check the ID and try again."
+msgstr "Vérifiez l’ID et réessayez."
+
+#: src/speedgtk/ui/dialogs/server_selector.py:71
+#: src/speedgtk/ui/server_picker.py:65
+msgid "Advanced server selector"
+msgstr "Sélecteur de serveur avancé"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:87
+msgid "Clear selection"
+msgstr "Effacer la sélection"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:95
+msgid "Custom server ID"
+msgstr "ID de serveur personnalisé"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:97
+msgid "Use an ID copied from speedtest.net, then press Enter to verify it."
+msgstr ""
+"Utilisez un ID copié depuis speedtest.net, puis appuyez sur Entrée pour le "
+"vérifier."
+
+#: src/speedgtk/ui/dialogs/server_selector.py:116
+msgid "Worldwide server search"
+msgstr "Recherche mondiale de serveurs"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:118
+msgid ""
+"Search Speedtest.net by city or provider. This optional web service may "
+"change or become unavailable."
+msgstr ""
+"Recherchez sur Speedtest.net par ville ou fournisseur. Ce service web "
+"facultatif peut changer ou devenir indisponible."
+
+#: src/speedgtk/ui/dialogs/server_selector.py:122
+msgid "City or provider"
+msgstr "Ville ou fournisseur"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:129
+msgid "Clear city or provider"
+msgstr "Effacer la ville ou le fournisseur"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:211
+msgid "Enter server IDs above; worldwide search accepts names."
+msgstr ""
+"Saisissez les ID de serveur ci-dessus ; la recherche mondiale accepte les "
+"noms."
+
+#: src/speedgtk/ui/dialogs/server_selector.py:225
+#, python-brace-format
+msgid "Server search unavailable · {error}"
+msgstr "Recherche de serveurs indisponible · {error}"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:230
+msgid "No matching servers"
+msgstr "Aucun serveur correspondant"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:239
+#, python-brace-format
+msgid "{count} result"
+msgstr "{count} résultat"
+
+#: src/speedgtk/ui/dialogs/server_selector.py:239
+#, python-brace-format
+msgid "{count} results"
+msgstr "{count} résultats"
 
 #: src/speedgtk/ui/dialogs/terms.py:9
 msgid "Use of the Ookla Speedtest CLI"
@@ -459,7 +591,7 @@ msgstr "Sortie obtenue : {output}"
 msgid "Try again"
 msgstr "Réessayer"
 
-#: src/speedgtk/ui/main_window.py:73 src/speedgtk/ui/main_window.py:319
+#: src/speedgtk/ui/main_window.py:73 src/speedgtk/ui/main_window.py:321
 msgid "Refresh the server list"
 msgstr "Actualiser la liste des serveurs"
 
@@ -491,65 +623,65 @@ msgstr "Recherche de la CLI officielle d'Ookla."
 msgid "Clear test"
 msgstr "Réinitialiser le test"
 
-#: src/speedgtk/ui/main_window.py:157 src/speedgtk/ui/main_window.py:367
+#: src/speedgtk/ui/main_window.py:157 src/speedgtk/ui/main_window.py:371
 msgid "Start test"
 msgstr "Lancer le test"
 
-#: src/speedgtk/ui/main_window.py:318
+#: src/speedgtk/ui/main_window.py:320
 msgid "Could not load the servers"
 msgstr "Impossible de charger les serveurs"
 
-#: src/speedgtk/ui/main_window.py:325
+#: src/speedgtk/ui/main_window.py:327
 #, python-brace-format
 msgid "Refresh the server list — nearby: {count}"
 msgstr "Actualiser la liste des serveurs — à proximité : {count}"
 
-#: src/speedgtk/ui/main_window.py:332
+#: src/speedgtk/ui/main_window.py:334
 msgid "Cancelling…"
 msgstr "Annulation…"
 
-#: src/speedgtk/ui/main_window.py:356
+#: src/speedgtk/ui/main_window.py:360
 msgid "Cannot start speedtest"
 msgstr "Impossible de lancer speedtest"
 
-#: src/speedgtk/ui/main_window.py:367
+#: src/speedgtk/ui/main_window.py:371
 msgid "Repeat test"
 msgstr "Refaire le test"
 
-#: src/speedgtk/ui/main_window.py:378
+#: src/speedgtk/ui/main_window.py:382
 msgid "Starting…"
 msgstr "Démarrage…"
 
-#: src/speedgtk/ui/main_window.py:431 src/speedgtk/ui/results_view.py:256
-#: src/speedgtk/ui/results_view.py:323
+#: src/speedgtk/ui/main_window.py:434 src/speedgtk/ui/results_view.py:258
+#: src/speedgtk/ui/results_view.py:325
 msgid "Ready"
 msgstr "Prêt"
 
-#: src/speedgtk/ui/main_window.py:448
+#: src/speedgtk/ui/main_window.py:452
 msgid "Test started…"
 msgstr "Test lancé…"
 
-#: src/speedgtk/ui/main_window.py:453
+#: src/speedgtk/ui/main_window.py:457
 msgid "Measuring ping…"
 msgstr "Mesure du ping…"
 
-#: src/speedgtk/ui/main_window.py:463
+#: src/speedgtk/ui/main_window.py:487
 msgid "Download…"
 msgstr "Téléchargement…"
 
-#: src/speedgtk/ui/main_window.py:463
+#: src/speedgtk/ui/main_window.py:487
 msgid "Upload…"
 msgstr "Téléversement…"
 
-#: src/speedgtk/ui/main_window.py:488
+#: src/speedgtk/ui/main_window.py:503
 msgid "Completed"
 msgstr "Terminé"
 
-#: src/speedgtk/ui/main_window.py:531 src/speedgtk/ui/main_window.py:533
+#: src/speedgtk/ui/main_window.py:531
 msgid "Test cancelled"
 msgstr "Test annulé"
 
-#: src/speedgtk/ui/main_window.py:539 src/speedgtk/ui/main_window.py:549
+#: src/speedgtk/ui/main_window.py:538 src/speedgtk/ui/main_window.py:549
 msgid "Error"
 msgstr "Erreur"
 
@@ -570,110 +702,114 @@ msgstr "Erreur de speedtest"
 msgid "Close"
 msgstr "Fermer"
 
-#: src/speedgtk/ui/results_view.py:148
+#: src/speedgtk/ui/results_view.py:150
 msgid "not available"
 msgstr "non disponible"
 
-#: src/speedgtk/ui/results_view.py:216
+#: src/speedgtk/ui/results_view.py:218
 msgid "DOWNLOAD"
 msgstr "DESCENDANT"
 
-#: src/speedgtk/ui/results_view.py:219
+#: src/speedgtk/ui/results_view.py:221
 msgid "UPLOAD"
 msgstr "MONTANT"
 
-#: src/speedgtk/ui/results_view.py:228
+#: src/speedgtk/ui/results_view.py:230
 msgid "Ping ms"
 msgstr "Ping ms"
 
-#: src/speedgtk/ui/results_view.py:233 src/speedgtk/ui/results_view.py:326
+#: src/speedgtk/ui/results_view.py:235 src/speedgtk/ui/results_view.py:328
 msgid "Idle ping"
 msgstr "Ping au repos"
 
-#: src/speedgtk/ui/results_view.py:236 src/speedgtk/ui/results_view.py:327
+#: src/speedgtk/ui/results_view.py:238 src/speedgtk/ui/results_view.py:329
 msgid "Download ping"
 msgstr "Ping en téléchargement"
 
-#: src/speedgtk/ui/results_view.py:239 src/speedgtk/ui/results_view.py:328
+#: src/speedgtk/ui/results_view.py:241 src/speedgtk/ui/results_view.py:330
 msgid "Upload ping"
 msgstr "Ping en téléversement"
 
-#: src/speedgtk/ui/results_view.py:248
+#: src/speedgtk/ui/results_view.py:250
 msgid "Jitter ms"
 msgstr "Gigue ms"
 
-#: src/speedgtk/ui/results_view.py:249
+#: src/speedgtk/ui/results_view.py:251
 msgid "Loss %"
 msgstr "Perte %"
 
-#: src/speedgtk/ui/results_view.py:322
+#: src/speedgtk/ui/results_view.py:324
 msgid "Status"
 msgstr "État"
 
-#: src/speedgtk/ui/results_view.py:323
+#: src/speedgtk/ui/results_view.py:325
 msgid "Phase"
 msgstr "Phase"
 
-#: src/speedgtk/ui/results_view.py:329
+#: src/speedgtk/ui/results_view.py:331
 msgid "Jitter"
 msgstr "Gigue"
 
-#: src/speedgtk/ui/results_view.py:330
+#: src/speedgtk/ui/results_view.py:332
 msgid "Download"
 msgstr "Téléchargement"
 
-#: src/speedgtk/ui/results_view.py:331
+#: src/speedgtk/ui/results_view.py:333
 msgid "Upload"
 msgstr "Téléversement"
 
-#: src/speedgtk/ui/results_view.py:332
+#: src/speedgtk/ui/results_view.py:334
 msgid "Packet loss"
 msgstr "Perte de paquets"
 
-#: src/speedgtk/ui/results_view.py:357
+#: src/speedgtk/ui/results_view.py:356
 msgid "ISP"
 msgstr "FAI"
 
-#: src/speedgtk/ui/results_view.py:361
+#: src/speedgtk/ui/results_view.py:360
 msgid "Server used"
 msgstr "Serveur utilisé"
 
-#: src/speedgtk/ui/results_view.py:379 src/speedgtk/ui/server_picker.py:107
+#: src/speedgtk/ui/results_view.py:373 src/speedgtk/ui/server_picker.py:125
 msgid "id"
 msgstr "id"
 
-#: src/speedgtk/ui/server_picker.py:13
+#: src/speedgtk/ui/server_picker.py:15
 msgid "The manual server ID must be a number"
 msgstr "L'ID de serveur manuel doit être un nombre"
 
-#: src/speedgtk/ui/server_picker.py:41
+#: src/speedgtk/ui/server_picker.py:58
 msgid "Server"
 msgstr "Serveur"
 
-#: src/speedgtk/ui/server_picker.py:48
-msgid "Manual server ID"
-msgstr "ID de serveur manuel"
-
-#: src/speedgtk/ui/server_picker.py:90
+#: src/speedgtk/ui/server_picker.py:108
 msgid "Loading the list…"
 msgstr "Chargement de la liste…"
 
-#: src/speedgtk/ui/server_picker.py:121 src/speedgtk/ui/server_picker.py:122
+#: src/speedgtk/ui/server_picker.py:139 src/speedgtk/ui/server_picker.py:140
 msgid "Automatic"
 msgstr "Automatique"
 
-#: src/speedgtk/ui/server_picker.py:124
+#: src/speedgtk/ui/server_picker.py:142
 #, python-brace-format
 msgid "Last one: {server}"
 msgstr "Dernier : {server}"
 
-#: src/speedgtk/ui/server_picker.py:126
+#: src/speedgtk/ui/server_picker.py:144
 msgid "Picked by speedtest, by latency"
 msgstr "Choisi par speedtest, selon la latence"
 
-#: src/speedgtk/ui/server_picker.py:163
-msgid "Ignored: a manual ID is set"
-msgstr "Ignoré : un ID manuel est défini"
+#: src/speedgtk/ui/server_picker.py:187
+#, python-brace-format
+msgid "Selected: {server}"
+msgstr "Sélectionné : {server}"
+
+#: src/speedgtk/ui/server_picker.py:193
+msgid "Worldwide search or custom server ID"
+msgstr "Recherche mondiale ou ID de serveur personnalisé"
+
+#~ msgid "Ignored: a manual ID is set"
+#~ msgstr "Ignoré : un ID manuel est défini"
 
 #~ msgid ""
 #~ "The <tt>speedtest</tt> command on this system is not Ookla's official "

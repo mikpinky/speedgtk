@@ -39,14 +39,14 @@ from .dialogs import (
 from .presentation import PingPresentation
 from .results_view import MeasurementsView, ResultDetails
 from .server_picker import ServerPicker
-from .widgets import PhaseProgress
+from .widgets import PhaseProgress, ServerContextSwitcher
 
 
 class SpeedGTKWindow(Adw.ApplicationWindow):
     def __init__(self, application, settings, history):
         super().__init__(application=application, title=APP_NAME)
         # GTK uses logical pixels; the compositor applies monitor scaling.
-        self.set_default_size(560, 984)
+        self.set_default_size(560, 900)
 
         self._settings = settings
         self._history = history
@@ -172,11 +172,13 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         test_actions.append(self._online_result_revealer)
         box.append(test_actions)
 
-        self._result_details = ResultDetails()
-        box.append(self._result_details)
-
         self._server_picker = ServerPicker(self._settings)
-        box.append(self._server_picker)
+        self._result_details = ResultDetails()
+        self._server_context = ServerContextSwitcher(
+            self._server_picker,
+            self._result_details,
+        )
+        box.append(self._server_context)
 
         scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER, vexpand=True)
         scroller.set_child(Adw.Clamp(child=box, maximum_size=620))
@@ -331,6 +333,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         if self._run is not None:
             self._set_phase("cancel", _("Cancelling…"))
             self._ping_presentation.cancel()
+            self._server_context.show_selector()
             self._start_button.set_sensitive(False)
             self._run.cancel()
             return
@@ -377,7 +380,6 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._result_url = None
         self._progress.reset()
         self._measurements.reset(_("Starting…"))
-        self._result_details.reset()
         self._set_result_actions_visible(False)
 
     def _set_result_actions_visible(self, visible):
@@ -428,6 +430,7 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
             return
         self._has_run = False
         self._reset_results()
+        self._server_context.show_selector()
         self._set_phase("idle", _("Ready"))
         self._set_running(False)
 
@@ -506,7 +509,8 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
     def _set_server_details(self, server, isp):
         if self._auto_server:
             self._server_picker.remember_auto_server(server)
-        self._result_details.set_details(server, isp)
+        if self._result_details.set_details(server, isp):
+            self._server_context.show_details()
 
     def _set_progress(self, progress):
         if isinstance(progress, (int, float)):
@@ -523,18 +527,20 @@ class SpeedGTKWindow(Adw.ApplicationWindow):
         self._set_running(False)
 
         if cancelled:
+            self._server_context.show_selector()
             self._set_phase("idle", _("Test cancelled"))
-            self._toast(_("Test cancelled"))
             self._set_result_actions_visible(True)
             return
 
         if self._last_error:
+            self._server_context.show_selector()
             short, detail = humanize_cli_error(self._last_error)
             self._set_phase("idle", _("Error"))
             self._toast(short, detail or self._last_error)
             return
 
         if status != 0:
+            self._server_context.show_selector()
             raw = extract_cli_error("", stderr_text)
             short, detail = humanize_cli_error(raw)
             if not raw:

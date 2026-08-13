@@ -2,7 +2,7 @@
 
 from gi.repository import Adw, Gtk
 
-from ..config import LAYOUT_TRANSITION_DURATION_MS, PLACEHOLDER
+from ..config import PLACEHOLDER
 from ..formatting import format_number, mbps
 from ..i18n import _
 from .widgets import DetailIcon, LatencyIcon, PhaseIcon, SpeedGauge
@@ -348,30 +348,22 @@ class MeasurementsView(Gtk.Stack):
         return label
 
 
-class ResultDetails(Gtk.Revealer):
-    """Collapsible server and ISP rows associated with a completed test."""
+class ResultDetails(Adw.PreferencesGroup):
+    """Server and ISP rows associated with the active or completed test."""
 
     def __init__(self):
         super().__init__()
-        self.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
-        self.set_transition_duration(LAYOUT_TRANSITION_DURATION_MS)
-        group = Adw.PreferencesGroup()
         self._isp_row = Adw.ActionRow(title=_("ISP"), subtitle=PLACEHOLDER)
         self._isp_row.set_subtitle_selectable(True)
         self._isp_row.add_prefix(DetailIcon("isp"))
-        group.add(self._isp_row)
+        self.add(self._isp_row)
         self._server_row = Adw.ActionRow(title=_("Server used"), subtitle=PLACEHOLDER)
         self._server_row.set_subtitle_selectable(True)
         self._server_row.add_prefix(DetailIcon("server"))
-        group.add(self._server_row)
-        self.set_child(group)
-
-    def reset(self):
-        self.set_reveal_child(False)
-        self._server_row.set_subtitle(PLACEHOLDER)
-        self._isp_row.set_subtitle(PLACEHOLDER)
+        self.add(self._server_row)
 
     def set_details(self, server, isp):
+        updated = False
         if isinstance(server, dict):
             self._server_row.set_subtitle(
                 "{} — {} ({}) · {} {}".format(
@@ -382,7 +374,8 @@ class ResultDetails(Gtk.Revealer):
                     server.get("id", "?"),
                 )
             )
-            self.set_reveal_child(True)
+            updated = True
         if isp:
             self._isp_row.set_subtitle(str(isp))
-            self.set_reveal_child(True)
+            updated = True
+        return updated
